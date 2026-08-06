@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   postgres-vector:
@@ -18,10 +17,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - rag_network
 
   medical-rag-api:
     build:
-      context: ..
+      context: .
       dockerfile: Dockerfile
     container_name: medical_rag_api
     ports:
@@ -36,6 +37,12 @@ services:
     depends_on:
       postgres-vector:
         condition: service_healthy
+    networks:
+      - rag_network
 
 volumes:
   pgvector_data:
+
+networks:
+  rag_network:
+    driver: bridge
