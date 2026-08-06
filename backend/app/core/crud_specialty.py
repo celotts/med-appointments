@@ -1,0 +1,18 @@
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+
+from app.models.specialty import Specialty
+from app.schemas.specialty import SpecialtyCreate
+
+
+async def get_specialties(db: AsyncSession, skip: int = 0, limit: int = 100):
+    result = await db.execute(select(Specialty).offset(skip).limit(limit))
+    return result.scalars().all()
+
+
+async def create_specialty(db: AsyncSession, specialty: SpecialtyCreate):
+    db_specialty = Specialty(nombre=specialty.nombre, descripcion=specialty.descripcion)
+    db.add(db_specialty)
+    await db.commit()
+    await db.refresh(db_specialty)
+    return db_specialty

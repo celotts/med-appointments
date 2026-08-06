@@ -47,9 +47,9 @@ shell:
 
 lint:
 	@echo "Ejecutando linter (flake8)..."
-	docker compose exec medical-rag-api flake8 app
+	docker compose exec medical-rag-api flake8 backend
 
 format:
 	@echo "Formateando el código con black y isort..."
-	docker compose exec medical-rag-api black app
-	docker compose exec medical-rag-api isort app
+	docker compose exec medical-rag-api black backend
+	docker compose exec medical-rag-api isort backend
