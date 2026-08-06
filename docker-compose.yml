@@ -21,11 +21,14 @@ services:
 
   medical-rag-api:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: . # El contexto es la raíz del proyecto
+      dockerfile: Dockerfile # El Dockerfile está en la raíz del proyecto
     container_name: medical_rag_api
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app
     extra_hosts:
       - "host.containers.internal:host-gateway"
       - "host.docker.internal:host-gateway"

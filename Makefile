@@ -1,15 +1,20 @@
 # Makefile para gestionar los contenedores con Docker / Podman
 
-.PHONY: help up down start logs ps clean
+.PHONY: help up down start logs ps clean shell lint format
 
 help:
 	@echo "Comandos disponibles:"
-	@echo "  make up    - Levanta los contenedores en segundo plano"
-	@echo "  make down  - Detiene contenedores, elimina redes y volúmenes (-v)"
-	@echo "  make logs  - Muestra los logs en tiempo real"
-	@echo "  make ps    - Lista el estado de los contenedores"
-	@echo "  make start - Detiene, elimina todo, reconstruye y levanta desde cero"
-	@echo "  make clean - Limpia contenedores y caché de BuildKit huérfanos"
+	@echo "\n--- Gestión de Contenedores ---"
+	@echo "  make up      - Levanta los contenedores en segundo plano"
+	@echo "  make down    - Detiene contenedores, elimina redes y volúmenes (-v)"
+	@echo "  make start   - Detiene, elimina todo, reconstruye y levanta desde cero"
+	@echo "  make logs    - Muestra los logs en tiempo real"
+	@echo "  make ps      - Lista el estado de los contenedores"
+	@echo "  make clean   - Limpia contenedores y caché de BuildKit huérfanos"
+	@echo "\n--- Desarrollo ---"
+	@echo "  make shell   - Inicia un shell interactivo en el contenedor de la API"
+	@echo "  make lint    - Ejecuta el linter (flake8) en el código de la API"
+	@echo "  make format  - Formatea el código de la API con black y isort"
 
 up:
 	@echo "Levantando los contenedores..."
@@ -35,3 +40,16 @@ ps:
 clean: down
 	@echo "Limpiando contenedores detenidos y caché de build..."
 	docker system prune -f
+
+shell:
+	@echo "Iniciando shell en el contenedor medical_rag_api..."
+	docker compose exec medical-rag-api /bin/sh
+
+lint:
+	@echo "Ejecutando linter (flake8)..."
+	docker compose exec medical-rag-api flake8 app
+
+format:
+	@echo "Formateando el código con black y isort..."
+	docker compose exec medical-rag-api black app
+	docker compose exec medical-rag-api isort app
