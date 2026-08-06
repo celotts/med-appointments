@@ -1,29 +1,50 @@
-# Imagen base ligera de Python 3.11
-FROM python:3.11.11-slim-bookworm
+# ==========================================
+# ETAPA 1: Builder (Compilación de ruedas/wheels)
+# ==========================================
+FROM python:3.11-slim AS builder
 
-# Evitar la creación de archivos .pyc y forzar salida sin buffer
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-# Directorio de trabajo en el contenedor
 WORKDIR /app
 
-# Instalar actualizaciones de seguridad y dependencias requeridas
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+# Instalar herramientas necesarias para compilar paquetes como asyncpg
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiar e instalar dependencias de Python
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
 
-# Copiar el código fuente del backend (esto ya incluye app/main.py)
+# Compilar todas las librerías a formato wheel para no necesitar gcc en la imagen final
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
+
+
+# ==========================================
+# ETAPA 2: Imagen Final (Ejecución Limpia)
+# ==========================================
+FROM python:3.11-slim AS runner
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# Instalar parches de seguridad del sistema y ÚNICAMENTE la librería en runtime para Postgres
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar las librerías precompiladas desde la etapa builder e instalarlas
+COPY --from=builder /app/wheels /wheels
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
+
+# Copiar el código fuente
 COPY backend/app ./app
 
-# Exponer el puerto de FastAPI
+# Crear usuario de sistema sin privilegios (Seguridad)
+RUN addgroup --system appgroup && adduser --system --group appuser
+USER appuser
+
 EXPOSE 8000
 
-# Comando para ejecutar FastAPI con Uvicorn
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,4 +1,3 @@
-
 services:
   postgres-vector:
     image: pgvector/pgvector:pg16
@@ -11,7 +10,7 @@ services:
       - "5432:5432"
     volumes:
       - pgvector_data:/var/lib/postgresql/data
-      - ./script_BD/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./script_BD:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U root -d appointment"]
       interval: 5s
@@ -27,12 +26,15 @@ services:
     container_name: medical_rag_api
     ports:
       - "8000:8000"
+    extra_hosts:
+      - "host.containers.internal:host-gateway"
+      - "host.docker.internal:host-gateway"
     environment:
-      # Conexión con Ollama en el Host (Linux / Podman)
+      # Conexión con Ollama en el Host (Linux / Podman / Docker)
       - OLLAMA_BASE_URL=http://host.containers.internal:11434
       - LLM_MODEL=llama3.2:latest
       - EMBEDDING_MODEL=nomic-embed-text:latest
-      # Conexión con el contenedor de Postgres
+      # Conexión asíncrona con PostgreSQL (asyncpg)
       - DATABASE_URL=postgresql+asyncpg://root:fc100711@postgres-vector:5432/appointment
     depends_on:
       postgres-vector:
