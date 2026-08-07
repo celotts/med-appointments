@@ -26,4 +26,4 @@ class User(Base):
         PG_UUID(as_uuid=True), ForeignKey("roles.id")
     )
 
-    role = relationship("Role", back_populates="users")
+    role = relationship("Role", back_populates="users", foreign_keys=[role_id])

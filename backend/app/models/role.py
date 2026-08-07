@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import String, func
+from sqlalchemy import String, func, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
@@ -18,13 +18,27 @@ class Role(Base):
 
     # Columnas de auditoría
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    updated_at: Mapped[datetime | None] = mapped_column(onupdate=func.now())
-    deleted_at: Mapped[datetime | None]
-    created_by_user_id: Mapped[uuid.UUID | None]
-    updated_by_user_id: Mapped[uuid.UUID | None]
-    deleted_by_user_id: Mapped[uuid.UUID | None]
-    created_by_role_id: Mapped[uuid.UUID | None]
-    updated_by_role_id: Mapped[uuid.UUID | None]
-    deleted_by_role_id: Mapped[uuid.UUID | None]
+    updated_at: Mapped[datetime | None] = mapped_column(
+        onupdate=func.now(), nullable=True
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    deleted_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    created_by_role_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("roles.id"), nullable=True
+    )
+    updated_by_role_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("roles.id"), nullable=True
+    )
+    deleted_by_role_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("roles.id"), nullable=True
+    )
 
-    users = relationship("User", back_populates="role")
+    users = relationship("User", back_populates="role", foreign_keys="[User.role_id]")
