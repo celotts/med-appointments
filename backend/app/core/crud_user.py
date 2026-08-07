@@ -48,6 +48,7 @@ async def create_user(db: AsyncSession, *, user_in: UserCreateSchema) -> UserMod
         email=user_in.email,
         full_name=user_in.full_name,
         password=hashed_password,
+        # Los campos address, phone, phone2, is_active usan sus valores por defecto del modelo
         role_id=user_in.role_id,
     )
     db.add(db_user)

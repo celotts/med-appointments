@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Column, String, ForeignKey, Boolean
+from sqlalchemy import String, ForeignKey, Boolean
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -18,12 +18,12 @@ class User(Base):
     )
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     password: Mapped[str] = mapped_column(String, nullable=False)
-    address: Mapped[str] = mapped_column(String(255), default="N/A")
-    phone: Mapped[str] = mapped_column(String(255), default="0000000000")
-    phone2: Mapped[str] = mapped_column(String(255), default="0000000000")
+    address: Mapped[str | None] = mapped_column(String(255), default="N/A")
+    phone: Mapped[str | None] = mapped_column(String(255), default="0000000000")
+    phone2: Mapped[str | None] = mapped_column(String(255), default="0000000000")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     role_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("roles.id")
     )
 
-    role = relationship("Role")
+    role = relationship("Role", back_populates="users")
