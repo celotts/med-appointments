@@ -22,7 +22,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 FROM python:3.11.9-alpine3.20 AS runner
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
 
 WORKDIR /app
 
@@ -31,11 +32,10 @@ RUN apk update && apk upgrade --no-cache && apk add --no-cache libpq
 
 # Copiar las librerías precompiladas desde la etapa builder e instalarlas
 COPY --from=builder /app/wheels /wheels
-RUN pip install --no-cache-dir --no-index --find-links=/wheels /wheels/* && \
-    rm -rf /wheels
+RUN pip install --no-cache-dir --no-index --find-links=/wheels /wheels/*
 
 # Copiar el código fuente
-COPY backend/app ./app
+COPY backend/app .
 
 # Crear usuario de sistema sin privilegios (Seguridad)
 RUN addgroup -S appgroup && adduser -S -G appgroup appuser
@@ -43,4 +43,4 @@ USER appuser
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

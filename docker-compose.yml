@@ -29,7 +29,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app
+      - ./backend/app:/app
     extra_hosts:
       - "host.containers.internal:host-gateway"
       - "host.docker.internal:host-gateway"
@@ -40,6 +40,11 @@ services:
       - EMBEDDING_MODEL=nomic-embed-text:latest
       # Conexión asíncrona con PostgreSQL (asyncpg)
       - DATABASE_URL=postgresql+asyncpg://root:fc100711@postgres-vector:5432/appointment
+      # Credenciales para el primer superusuario (leídas desde el .env)
+      - FIRST_SUPERUSER_EMAIL=${FIRST_SUPERUSER_EMAIL}
+      - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD}
+      - SECRET_KEY=${SECRET_KEY}
+      - ACCESS_TOKEN_EXPIRE_SECONDS=${ACCESS_TOKEN_EXPIRE_SECONDS}
     depends_on:
       postgres-vector:
         condition: service_healthy
