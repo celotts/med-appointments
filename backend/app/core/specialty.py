@@ -1,21 +1,13 @@
-from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from sqlalchemy import Column, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column
+
+from core.db import Base
 
 
-# Propiedades compartidas por todos los esquemas
-class SpecialtyBase(BaseModel):
-    nombre: str
-    descripcion: str | None = None
+class Specialty(Base):
+    __tablename__ = "especialidades"
 
-
-# Propiedades para recibir en la creación de una especialidad
-class SpecialtyCreate(SpecialtyBase):
-    pass
-
-
-# Propiedades para leer desde la API (incluye el id y la fecha de creación)
-class Specialty(SpecialtyBase):
-    id: int
-    created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    nombre: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    descripcion: Mapped[str | None] = mapped_column(Text)
+    # created_at es manejado por la base de datos por defecto.
