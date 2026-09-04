@@ -1,0 +1,17 @@
+# Ruff lint config
+# Nota: desactivamos B008 (Depends() como default de argumento) porque es el
+# patrón idiomático de FastAPI para inyección de dependencias; no es un error.
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+    "B008",        # Depends() en defaults de argumento (patrón canónico de FastAPI)
+    "E501",        # líneas largas
+]
+
+[lint.per-file-ignores]
+"app/api/endpoints/*.py" = ["B008"]
+"app/*.py" = ["B008"]
+
+[format]
+# objetivo: keep defaults razonables
