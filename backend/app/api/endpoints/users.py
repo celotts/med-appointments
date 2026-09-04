@@ -1,14 +1,13 @@
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from dependencies import get_db, get_current_user
 from core import crud_user
+from dependencies import get_current_user, get_db
+from fastapi import APIRouter, Depends, HTTPException
 from models.user import User as UserModel
 from schemas.user import User, UserCreate, UserUpdate
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -104,7 +103,7 @@ async def update_user(
 async def delete_user(
     *,
     db: AsyncSession = Depends(get_db),
-    user__id: uuid.UUID,
+    user_id: uuid.UUID,
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
     """Elimina un usuario."""

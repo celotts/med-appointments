@@ -1,2 +1,22 @@
+# Entornos virtuales
 venv/
 .venv/
+
+# Secretos y entorno
+.env
+.env.local
+*.env
+
+# Caché de Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Entorno y herramientas de edición
+.DS_Store
+.idea/
+.vscode/

@@ -36,8 +36,8 @@ services:
     environment:
       # Conexión con Ollama en el Host (Linux / Podman / Docker)
       - OLLAMA_BASE_URL=http://host.containers.internal:11434
-      - LLM_MODEL=llama3.2:latest
-      - EMBEDDING_MODEL=nomic-embed-text:latest
+      - OLLAMA_LLM_MODEL=llama3.2
+      - OLLAMA_EMBEDDING_MODEL=nomic-embed-text
       # Conexión asíncrona con PostgreSQL (asyncpg)
       - DATABASE_URL=postgresql+asyncpg://root:fc100711@postgres-vector:5432/appointment
       # Credenciales para el primer superusuario (leídas desde el .env)

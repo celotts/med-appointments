@@ -10,6 +10,11 @@ class SpecialtyCreate(SpecialtyBase):
     pass
 
 
+class SpecialtyUpdate(BaseModel):
+    nombre: str | None = None
+    descripcion: str | None = None
+
+
 class Specialty(SpecialtyBase):
     id: int
 
