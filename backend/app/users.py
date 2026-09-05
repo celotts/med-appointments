@@ -44,12 +44,14 @@ async def create_user(
 ) -> User:
     try:
         user = await crud_user.create_user(db=db, user_in=user_in)
-    except IntegrityError:
-        raise HTTPException(status_code=400, detail="El email ya está registrado.")
+    except IntegrityError as exc:
+        raise HTTPException(
+            status_code=400, detail="El email ya está registrado."
+        ) from exc
     return user
 
 
-@router.get(
+router.get(
     "/{user_id}",
     response_model=User,
     summary="Obtener un usuario por su ID",
@@ -57,6 +59,8 @@ async def create_user(
         404: {"description": "El usuario con el ID especificado no fue encontrado."}
     },
 )
+
+
 async def read_user_by_id(
     user_id: uuid.UUID,
     db: AsyncSession = Depends(dependencies.get_db),

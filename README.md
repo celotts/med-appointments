@@ -12,7 +12,7 @@ API contenerizada para la **gestión de citas médicas** (agendar, reagendar, tr
 
 ## Arquitectura
 
-```
+```text
 medical_appointments/
 │
 ├── backend/
@@ -26,6 +26,8 @@ medical_appointments/
 │   │   ├── schemas/         # Pydantic
 │   │   ├── dependencies.py  # get_db, get_current_user (JWT)
 │   │   └── main.py          # App FastAPI + registro de routers
+```
+
 │   ├── tests/               # Smoke tests integrales contra la BD real
 │   ├── run.sh               # Script de arranque/verificación
 │   └── requirements.txt
@@ -33,7 +35,6 @@ medical_appointments/
 ├── docker-compose.yml       # postgres(pgvector) + api
 ├── script_BD/init.sql       # Esquema inicial (source-of-truth)
 └── .env                     # Variables de entorno (NO versionar)
-```
 
 ---
 
@@ -43,10 +44,12 @@ medical_appointments/
 - Ollama corriendo en `http://localhost:11434` con:
   - `nomic-embed-text` (embeddings, 768 dims)
   - `llama3.2` (LLM)
+
   ```sh
   ollama pull nomic-embed-text
   ollama pull llama3.2
   ```
+
 - Python 3.11+ (venv)
 
 ---
@@ -70,6 +73,8 @@ ACCESS_TOKEN_EXPIRE_SECONDS=90000
 # OLLAMA_BASE_URL=http://localhost:11434
 # OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 # OLLAMA_LLM_MODEL=llama3.2
+```sh
+# Ollama configuration example
 ```
 
 ### Levantar la base de datos
@@ -114,21 +119,25 @@ venv/bin/python -m alembic history                      # historial
 ## Endpoints
 
 Autenticación (Bearer JWT):
+
 - `POST /api/v1/login/access-token`
 
 Catálogos:
+
 - `GET|POST /api/v1/specialties/` · `GET|PUT|DELETE /api/v1/specialties/{id}`
 - `GET|POST /api/v1/medicos/` · `GET|PUT|DELETE /api/v1/medicos/{id}`
 - `GET|POST /api/v1/pacientes/` · `GET|PUT|DELETE /api/v1/pacientes/{id}`
 - `GET /api/v1/estados-cita/`
 
 Núcleo de negocio (citas y notas):
+
 - `GET|POST /api/v1/citas/` — listar/filtrar y **agendar** (detección de conflictos de horario → 409)
 - `GET|PUT|DELETE /api/v1/citas/{id}` — **reagendar** (transiciona a `REAGENDADA`)
 - `PATCH /api/v1/citas/{id}/estado` — **cambiar estado** (máquina de transiciones válidas)
 - `GET|POST /api/v1/notas/` · `GET|PUT|DELETE /api/v1/notas/{id}` — notas médicas (1 por cita)
 
 RAG / AI Agent:
+
 - `GET /api/v1/rag/health` — estado de Ollama + nº de vectores
 - `POST /api/v1/rag/ingest` — ingesta de un documento vectorial
 - `POST /api/v1/rag/ingest-nota/{cita_id}` — indexa una nota médica existente
@@ -151,7 +160,7 @@ El endpoint `POST /api/v1/rag/chat` recibe:
 El agente usa **tool calling** con las herramientas:
 
 | Herramienta | Acción |
-|---|---|
+| --- | --- |
 | `buscar_en_documentos` | Búsqueda semántica sobre `documentos_vectoriales` |
 | `consultar_citas_paciente` / `consultar_citas_medico` | Citas por nombre completo |
 | `buscar_pacientes` / `buscar_medicos` | Alta de catálogos por nombre |
