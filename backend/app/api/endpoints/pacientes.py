@@ -1,13 +1,12 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from dependencies import get_db, get_current_user
 from core import crud_paciente
+from dependencies import get_current_user, get_db
+from fastapi import APIRouter, Depends, HTTPException
 from models.user import User as UserModel
 from schemas.paciente import Paciente, PacienteCreate, PacienteUpdate
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 

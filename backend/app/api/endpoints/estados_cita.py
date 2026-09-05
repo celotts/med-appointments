@@ -1,12 +1,11 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from dependencies import get_db, get_current_user
 from core import crud_cita
+from dependencies import get_current_user, get_db
+from fastapi import APIRouter, Depends
 from models.user import User as UserModel
 from schemas.cita import EstadoCitaOut
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 

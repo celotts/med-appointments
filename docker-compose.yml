@@ -1,3 +1,4 @@
+
 services:
   postgres-vector:
     image: pgvector/pgvector:pg16
@@ -21,26 +22,24 @@ services:
 
   medical-rag-api:
     build:
-      context: . # El contexto es la raíz del proyecto
-      dockerfile: Dockerfile # El Dockerfile está en la raíz del proyecto
+      context: .
+      dockerfile: Dockerfile
     container_name: medical_rag_api
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-    working_dir: /app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload  # Cambió de app.main:app a main:app
+    working_dir: /app/app                                           # Apunta directo al interior
     ports:
       - "8000:8000"
     volumes:
-      - ./backend/app:/app
+      - ./backend/app:/app/app                                      # Monta el código dentro de app/app
     extra_hosts:
       - "host.containers.internal:host-gateway"
       - "host.docker.internal:host-gateway"
     environment:
-      # Conexión con Ollama en el Host (Linux / Podman / Docker)
+      - PYTHONPATH=/app/app
       - OLLAMA_BASE_URL=http://host.containers.internal:11434
       - OLLAMA_LLM_MODEL=llama3.2
       - OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-      # Conexión asíncrona con PostgreSQL (asyncpg)
       - DATABASE_URL=postgresql+asyncpg://root:fc100711@postgres-vector:5432/appointment
-      # Credenciales para el primer superusuario (leídas desde el .env)
       - FIRST_SUPERUSER_EMAIL=${FIRST_SUPERUSER_EMAIL}
       - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD}
       - SECRET_KEY=${SECRET_KEY}

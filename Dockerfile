@@ -34,8 +34,8 @@ RUN apk update && apk upgrade --no-cache && apk add --no-cache libpq
 COPY --from=builder /app/wheels /wheels
 RUN pip install --no-cache-dir --no-index --find-links=/wheels /wheels/*
 
-# Copiar el código fuente
-COPY backend/app .
+# Copiar el código fuente asegurando que quede dentro de la carpeta app
+COPY backend/app /app/app
 
 # Crear usuario de sistema sin privilegios (Seguridad)
 RUN addgroup -S appgroup && adduser -S -G appgroup appuser
@@ -43,4 +43,5 @@ USER appuser
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Apuntar correctamente al módulo dentro del paquete app
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

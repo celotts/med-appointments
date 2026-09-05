@@ -1,9 +1,8 @@
 from datetime import datetime
 
+from core.db import Base
 from sqlalchemy import Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
-
-from core.db import Base
 
 
 class Specialty(Base):

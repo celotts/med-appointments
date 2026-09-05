@@ -1,7 +1,6 @@
+from core.db import Base
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
-
-from core.db import Base
 
 
 class EstadoCita(Base):

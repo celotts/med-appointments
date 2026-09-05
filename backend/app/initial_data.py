@@ -1,12 +1,11 @@
 import logging
 import uuid
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
+from core import crud_user
 from core.config import settings
 from core.db import SessionLocal
-from core import crud_user
 from schemas.user import UserCreate
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

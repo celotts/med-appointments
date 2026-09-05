@@ -1,11 +1,12 @@
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from models.nota_medica import NotaMedica as NotaMedicaModel
 from schemas.cita import (
     NotaMedicaCreate as NotaMedicaCreateSchema,
+)
+from schemas.cita import (
     NotaMedicaUpdate as NotaMedicaUpdateSchema,
 )
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def get_nota(db: AsyncSession, nota_id: int) -> NotaMedicaModel | None:

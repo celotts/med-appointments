@@ -3,10 +3,9 @@
 from typing import Any
 
 import asyncpg
+from core.config import settings
 from langchain_ollama import OllamaEmbeddings
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from core.config import settings
 
 _EMBEDDINGS_INSTANCE: OllamaEmbeddings | None = None
 

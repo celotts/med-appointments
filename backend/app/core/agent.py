@@ -1,15 +1,12 @@
 """Agente conversacional RAG + herramientas de agendamiento con LangChain + Ollama."""
 
 import json
-from typing import Any
 
+from core.config import settings
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 from langchain_ollama import ChatOllama
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from core.config import settings
 
 _SYSTEM_PROMPT = """Eres MedAssist, un asistente inteligente de gestión de citas médicas.
 
@@ -48,8 +45,8 @@ async def buscar_en_documentos(query: str = "", ref_tipo: str | None = None) -> 
         query: Consulta en lenguaje natural sobre contenido médico.
         ref_tipo: Filtrar por tipo de referencia (ej: 'NOTA_MEDICA', 'DOCUMENTO').
     """
-    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
     from core.rag import search_documentos as _search
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     engine = create_async_engine(_conn_str)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
@@ -70,7 +67,7 @@ async def consultar_citas_paciente(nombre_paciente: str = "") -> str:
     Args:
         nombre_paciente: Nombre o apellido del paciente (búsqueda parcial).
     """
-    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     engine = create_async_engine(_conn_str)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
@@ -123,7 +120,7 @@ async def consultar_citas_medico(nombre_medico: str = "") -> str:
     Args:
         nombre_medico: Nombre o apellido del médico (búsqueda parcial).
     """
-    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     engine = create_async_engine(_conn_str)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
@@ -176,7 +173,7 @@ async def buscar_pacientes(nombre: str = "") -> str:
     Args:
         nombre: Nombre o apellido del paciente (búsqueda parcial).
     """
-    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     engine = create_async_engine(_conn_str)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
@@ -214,7 +211,7 @@ async def buscar_medicos(nombre: str = "") -> str:
     Args:
         nombre: Nombre o apellido del médico (búsqueda parcial).
     """
-    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     engine = create_async_engine(_conn_str)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
@@ -255,7 +252,7 @@ async def sugerir_reagendamiento(cita_id: int, nueva_fecha: str) -> str:
         cita_id: ID de la cita a reagendar.
         nueva_fecha: Nueva fecha propuesta en formato ISO 8601 (ej: '2026-09-15T10:00:00').
     """
-    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     engine = create_async_engine(_conn_str)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
@@ -311,7 +308,7 @@ async def ejecutar_reagendamiento(
     """
     from datetime import datetime, timedelta
 
-    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     if not confirmado:
         return (
@@ -362,7 +359,7 @@ async def cancelar_cita(cita_id: int, confirmado: bool = False) -> str:
         cita_id: ID de la cita a cancelar.
         confirmado: Debe ser True; si es False, devuelve advertencia sin ejecutar.
     """
-    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     if not confirmado:
         return (
@@ -399,7 +396,7 @@ async def contar_registros() -> str:
 
     Útil para responder preguntas como '¿cuántos pacientes hay?', '¿cuántas citas existen?'.
     """
-    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     engine = create_async_engine(_conn_str)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
@@ -471,9 +468,7 @@ async def chat_con_agente(
 
         messages.append(reply)
         for tool_call in reply.tool_calls:
-            tool_fn = next(
-                (t for t in _TOOLS if t.name == tool_call["name"]), None
-            )
+            tool_fn = next((t for t in _TOOLS if t.name == tool_call["name"]), None)
             try:
                 if tool_fn is None:
                     tool_result = f"Herramienta desconocida: {tool_call['name']}"

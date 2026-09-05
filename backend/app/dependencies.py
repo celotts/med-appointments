@@ -1,16 +1,15 @@
 import uuid
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt
-from pydantic import ValidationError
-from sqlalchemy.ext.asyncio import AsyncSession
-
+from core import crud_user
 from core.config import settings
 from core.db import SessionLocal
 from core.security import ALGORITHM
-from core import crud_user
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt
 from models.user import User
+from pydantic import ValidationError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 reusable_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/v1/login/access-token")
 

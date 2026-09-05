@@ -24,7 +24,7 @@ async def login_access_token(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email o contraseña incorrectos",
+            detail="Incorrect email or password",
         )
     return {
         "access_token": create_access_token(user.id),

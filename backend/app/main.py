@@ -1,8 +1,3 @@
-import asyncio
-
-from fastapi import FastAPI
-
-from core.base import Base  # noqa: F401, I001
 from api.endpoints import (
     citas,
     estados_cita,
@@ -13,6 +8,8 @@ from api.endpoints import (
     specialties,
     users,
 )
+from core.base import Base  # noqa: F401, I001
+from fastapi import FastAPI
 from initial_data import main as init_db
 
 app = FastAPI(
@@ -41,6 +38,8 @@ app.include_router(
 )
 app.include_router(medicos.router, prefix="/api/v1/medicos", tags=["Médicos"])
 app.include_router(pacientes.router, prefix="/api/v1/pacientes", tags=["Pacientes"])
-app.include_router(estados_cita.router, prefix="/api/v1/estados-cita", tags=["Estados de cita"])
+app.include_router(
+    estados_cita.router, prefix="/api/v1/estados-cita", tags=["Estados de cita"]
+)
 app.include_router(citas.router)
 app.include_router(rag.router)

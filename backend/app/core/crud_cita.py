@@ -1,21 +1,21 @@
 from datetime import datetime
 
+from models.cita import Cita as CitaModel
+from models.estado_cita import EstadoCita as EstadoCitaModel
+from schemas.cita import (
+    TRANSICIONES_VALIDAS,
+    CitaEstadoUpdate,
+    EstadoCitaCodigo,
+)
+from schemas.cita import (
+    CitaCreate as CitaCreateSchema,
+)
+from schemas.cita import (
+    CitaUpdate as CitaUpdateSchema,
+)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-
-from models.cita import Cita as CitaModel
-from models.estado_cita import EstadoCita as EstadoCitaModel
-from models.nota_medica import NotaMedica as NotaMedicaModel
-from schemas.cita import (
-    TRANSICIONES_VALIDAS,
-    CitaCreate as CitaCreateSchema,
-    CitaEstadoUpdate,
-    CitaUpdate as CitaUpdateSchema,
-    EstadoCitaCodigo,
-    NotaMedicaCreate as NotaMedicaCreateSchema,
-    NotaMedicaUpdate as NotaMedicaUpdateSchema,
-)
 
 # Estados que bloquean el horario del médico (impiden agendamiento en esa franja)
 _ESTADOS_QUE_OCUPAN = (
@@ -46,9 +46,7 @@ async def get_estado_by_id(db: AsyncSession, estado_id: int) -> EstadoCitaModel 
 
 
 async def get_estados(db: AsyncSession) -> list[EstadoCitaModel]:
-    result = await db.execute(
-        select(EstadoCitaModel).order_by(EstadoCitaModel.id)
-    )
+    result = await db.execute(select(EstadoCitaModel).order_by(EstadoCitaModel.id))
     return result.scalars().all()
 
 
@@ -70,9 +68,11 @@ async def get_citas(
     medico_id: int | None = None,
     estado: str | None = None,
 ) -> list[CitaModel]:
-    stmt = select(CitaModel).options(
-        selectinload(CitaModel.estado)
-    ).order_by(CitaModel.fecha_hora_inicio.desc())
+    stmt = (
+        select(CitaModel)
+        .options(selectinload(CitaModel.estado))
+        .order_by(CitaModel.fecha_hora_inicio.desc())
+    )
     if paciente_id is not None:
         stmt = stmt.where(CitaModel.paciente_id == paciente_id)
     if medico_id is not None:
@@ -122,7 +122,9 @@ async def create_cita(db: AsyncSession, cita: CitaCreateSchema) -> CitaModel:
 
     db_estado = await get_estado_by_codigo(db, EstadoCitaCodigo.PENDIENTE)
     if db_estado is None:
-        raise ValueError("No existe el estado base PENDIENTE. Ejecutar la semilla de estados.")
+        raise ValueError(
+            "No existe el estado base PENDIENTE. Ejecutar la semilla de estados."
+        )
 
     db_cita = CitaModel(
         paciente_id=cita.paciente_id,
@@ -139,13 +141,15 @@ async def create_cita(db: AsyncSession, cita: CitaCreateSchema) -> CitaModel:
 
 
 async def reagendar_cita(
-    db: AsyncSession, db_cita: CitaModel, cita: CitaUpdateSchema, *, nuevo_estado: bool = True
+    db: AsyncSession,
+    db_cita: CitaModel,
+    cita: CitaUpdateSchema,
+    *,
+    nuevo_estado: bool = True,
 ) -> CitaModel:
     """Reagenda una cita a una nueva franja horaria y la marca como REAGENDADA."""
     if db_cita.estado.codigo in _ESTADOS_TERMINALES:
-        raise ValueError(
-            "No se puede reagendar una cita cancelada o completada."
-        )
+        raise ValueError("No se puede reagendar una cita cancelada o completada.")
 
     nueva_inicio = cita.fecha_hora_inicio or db_cita.fecha_hora_inicio
     nueva_fin = cita.fecha_hora_fin or db_cita.fecha_hora_fin

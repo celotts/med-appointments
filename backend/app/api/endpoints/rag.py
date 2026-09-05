@@ -2,14 +2,11 @@
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from dependencies import get_db, get_current_user
+from core.agent import chat_con_agente
 from core.config import settings
 from core.rag import ingest_documento, search_documentos
-from core.agent import chat_con_agente
+from dependencies import get_current_user, get_db
+from fastapi import APIRouter, Depends, HTTPException
 from models.user import User as UserModel
 from schemas.rag import (
     ChatRequest,
@@ -19,8 +16,9 @@ from schemas.rag import (
     DocumentoSearchRequest,
     DocumentoSearchResult,
     HealthCheck,
-    NotaMedicaIngestRequest,
 )
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/v1", tags=["RAG & AI Agent"])
 
@@ -46,9 +44,7 @@ async def rag_health(
     except Exception:
         pass
 
-    result = await db.execute(
-        text("SELECT COUNT(*) FROM documentos_vectoriales")
-    )
+    result = await db.execute(text("SELECT COUNT(*) FROM documentos_vectoriales"))
     vector_count = result.scalar() or 0
 
     return HealthCheck(
@@ -82,7 +78,9 @@ async def ingest(
         )
         return result
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error al ingestar documento: {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"Error al ingestar documento: {exc}"
+        )
 
 
 @router.post(

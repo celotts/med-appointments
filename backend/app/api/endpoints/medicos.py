@@ -1,22 +1,19 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from dependencies import get_db, get_current_user
 from core import crud_medico, crud_specialty
+from dependencies import get_current_user, get_db
+from fastapi import APIRouter, Depends, HTTPException
 from models.user import User as UserModel
 from schemas.medico import Medico, MedicoCreate, MedicoUpdate
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
 
 async def _ensure_especialidad(db: AsyncSession, especialidad_id: int) -> None:
     if not await crud_specialty.get_specialty(db, especialidad_id):
-        raise HTTPException(
-            status_code=404, detail="Especialidad no encontrada."
-        )
+        raise HTTPException(status_code=404, detail="Especialidad no encontrada.")
 
 
 @router.get(

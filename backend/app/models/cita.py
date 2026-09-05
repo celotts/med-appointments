@@ -1,9 +1,16 @@
-from datetime import datetime
+from __future__ import annotations
 
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+from core.db import Base
 from sqlalchemy import DateTime, ForeignKey, Integer, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from core.db import Base
+if TYPE_CHECKING:
+    from .estado_cita import EstadoCita
+    from .medico import Medico
+    from .paciente import Paciente
 
 
 class Cita(Base):
@@ -30,6 +37,6 @@ class Cita(Base):
         DateTime(timezone=True), server_default=func.current_timestamp(), nullable=True
     )
 
-    paciente: Mapped["Paciente"] = relationship("Paciente")
-    medico: Mapped["Medico"] = relationship("Medico")
-    estado: Mapped["EstadoCita"] = relationship("EstadoCita")
+    paciente: Mapped[Paciente] = relationship("Paciente")
+    medico: Mapped[Medico] = relationship("Medico")
+    estado: Mapped[EstadoCita] = relationship("EstadoCita")

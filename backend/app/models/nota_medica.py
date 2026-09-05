@@ -1,9 +1,8 @@
 from datetime import datetime
 
+from core.db import Base
 from sqlalchemy import DateTime, ForeignKey, Integer, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
-
-from core.db import Base
 
 
 class NotaMedica(Base):

@@ -1,11 +1,8 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from dependencies import get_db, get_current_user
 from core import crud_cita, crud_medico, crud_nota_medica, crud_paciente
+from dependencies import get_current_user, get_db
+from fastapi import APIRouter, Depends, HTTPException
 from models.user import User as UserModel
 from schemas.cita import (
     CitaCreate,
@@ -16,6 +13,8 @@ from schemas.cita import (
     NotaMedicaOut,
     NotaMedicaUpdate,
 )
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/v1", tags=["Citas"])
 
@@ -183,9 +182,7 @@ async def read_notas(
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
     """Lista de notas médicas, opcionalmente filtradas por cita."""
-    return await crud_nota_medica.get_notas(
-        db, skip=skip, limit=limit, cita_id=cita_id
-    )
+    return await crud_nota_medica.get_notas(db, skip=skip, limit=limit, cita_id=cita_id)
 
 
 @router.post(
@@ -209,15 +206,11 @@ async def create_nota(
     if not cita:
         raise HTTPException(status_code=404, detail="CitaOut no encontrada.")
     if await crud_nota_medica.get_nota_by_cita(db, nota_in.cita_id):
-        raise HTTPException(
-            status_code=400, detail="La cita ya tiene una nota médica."
-        )
+        raise HTTPException(status_code=400, detail="La cita ya tiene una nota médica.")
     try:
         return await crud_nota_medica.create_nota(db, nota=nota_in)
     except IntegrityError:
-        raise HTTPException(
-            status_code=400, detail="La cita ya tiene una nota médica."
-        )
+        raise HTTPException(status_code=400, detail="La cita ya tiene una nota médica.")
 
 
 @router.get(
