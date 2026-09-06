@@ -13,11 +13,11 @@ router = APIRouter()
 @router.get(
     "/",
     response_model=list[EstadoCitaOut],
-    summary="Obtener el catálogo de estados de cita",
+    summary="Get the appointment status catalog",
 )
 async def read_estados(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Lista los estados posibles de una cita (PENDIENTE, CONFIRMADA, etc.)."""
+    """Lists the possible statuses of an appointment (PENDING, CONFIRMED, etc.)."""
     return await crud_cita.get_estados(db)

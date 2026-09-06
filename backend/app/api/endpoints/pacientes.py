@@ -14,7 +14,7 @@ router = APIRouter()
 @router.get(
     "/",
     response_model=list[Paciente],
-    summary="Obtener una lista de pacientes",
+    summary="Get a list of patients",
 )
 async def read_pacientes(
     db: AsyncSession = Depends(get_db),
@@ -22,7 +22,7 @@ async def read_pacientes(
     limit: int = 100,
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Obtiene una lista de pacientes."""
+    """Gets a list of patients."""
     return await crud_paciente.get_pacientes(db, skip=skip, limit=limit)
 
 
@@ -30,8 +30,8 @@ async def read_pacientes(
     "/",
     response_model=Paciente,
     status_code=201,
-    summary="Crear un nuevo paciente",
-    responses={400: {"description": "El email ya está registrado."}},
+    summary="Create a new patient",
+    responses={400: {"description": "Email is already registered."}},
 )
 async def create_paciente(
     *,
@@ -39,36 +39,36 @@ async def create_paciente(
     paciente_in: PacienteCreate,
     current_user: UserModel = Depends(get_current_user),
 ) -> Paciente:
-    """Crea un nuevo paciente."""
+    """Creates a new patient."""
     try:
         return await crud_paciente.create_paciente(db, paciente=paciente_in)
     except IntegrityError:
-        raise HTTPException(status_code=400, detail="El email ya está registrado.")
+        raise HTTPException(status_code=400, detail="Email is already registered.")
 
 
 @router.get(
     "/{paciente_id}",
     response_model=Paciente,
-    summary="Obtener un paciente por su ID",
-    responses={404: {"description": "El paciente no fue encontrado."}},
+    summary="Get a patient by ID",
+    responses={404: {"description": "Patient not found."}},
 )
 async def read_paciente_by_id(
     paciente_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Obtiene un paciente por su ID."""
+    """Gets a patient by ID."""
     paciente = await crud_paciente.get_paciente(db, paciente_id=paciente_id)
     if not paciente:
-        raise HTTPException(status_code=404, detail="Paciente no encontrado.")
+        raise HTTPException(status_code=404, detail="Patient not found.")
     return paciente
 
 
 @router.put(
     "/{paciente_id}",
     response_model=Paciente,
-    summary="Actualizar un paciente existente",
-    responses={404: {"description": "El paciente no fue encontrado."}},
+    summary="Update an existing patient",
+    responses={404: {"description": "Patient not found."}},
 )
 async def update_paciente(
     *,
@@ -77,23 +77,23 @@ async def update_paciente(
     paciente_in: PacienteUpdate,
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Actualiza un paciente existente."""
+    """Updates an existing patient."""
     db_paciente = await crud_paciente.get_paciente(db, paciente_id=paciente_id)
     if not db_paciente:
-        raise HTTPException(status_code=404, detail="Paciente no encontrado.")
+        raise HTTPException(status_code=404, detail="Patient not found.")
     try:
         return await crud_paciente.update_paciente(
             db, db_paciente=db_paciente, paciente=paciente_in
         )
     except IntegrityError:
-        raise HTTPException(status_code=400, detail="El email ya está registrado.")
+        raise HTTPException(status_code=400, detail="Email is already registered.")
 
 
 @router.delete(
     "/{paciente_id}",
     response_model=Paciente,
-    summary="Eliminar un paciente",
-    responses={404: {"description": "El paciente no fue encontrado."}},
+    summary="Delete a patient",
+    responses={404: {"description": "Patient not found."}},
 )
 async def delete_paciente(
     *,
@@ -101,8 +101,8 @@ async def delete_paciente(
     paciente_id: int,
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Elimina un paciente."""
+    """Deletes a patient."""
     paciente = await crud_paciente.delete_paciente(db, paciente_id=paciente_id)
     if not paciente:
-        raise HTTPException(status_code=404, detail="Paciente no encontrado.")
+        raise HTTPException(status_code=404, detail="Patient not found.")
     return paciente

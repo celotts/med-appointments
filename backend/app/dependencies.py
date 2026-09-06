@@ -28,10 +28,10 @@ async def get_current_user(
     except (jwt.JWTError, ValidationError, AttributeError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No se pudo validar las credenciales.",
+            detail="Could not validate credentials.",
             headers={"WWW-Authenticate": "Bearer"},
         )
     user = await crud_user.get_user(db, user_id=user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail="User not found.")
     return user

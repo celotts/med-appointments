@@ -14,7 +14,7 @@ router = APIRouter()
 @router.get(
     "/",
     response_model=list[Specialty],
-    summary="Obtener una lista de especialidades",
+    summary="Get a list of specialties",
 )
 async def read_specialties(
     db: AsyncSession = Depends(get_db),
@@ -22,7 +22,7 @@ async def read_specialties(
     limit: int = 100,
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Obtiene una lista de especialidades médicas."""
+    """Gets a list of medical specialties."""
     return await crud_specialty.get_specialties(db, skip=skip, limit=limit)
 
 
@@ -30,9 +30,9 @@ async def read_specialties(
     "/",
     response_model=Specialty,
     status_code=201,
-    summary="Crear una nueva especialidad",
+    summary="Create a new specialty",
     responses={
-        400: {"description": "Ya existe una especialidad con ese nombre."},
+        400: {"description": "A specialty with that name already exists."},
     },
 )
 async def create_specialty(
@@ -41,21 +41,21 @@ async def create_specialty(
     specialty_in: SpecialtyCreate,
     current_user: UserModel = Depends(get_current_user),
 ) -> Specialty:
-    """Crea una nueva especialidad médica."""
+    """Creates a new medical specialty."""
     try:
         return await crud_specialty.create_specialty(db, specialty=specialty_in)
     except IntegrityError:
         raise HTTPException(
-            status_code=400, detail="Ya existe una especialidad con ese nombre."
+            status_code=400, detail="A specialty with that name already exists."
         )
 
 
 @router.get(
     "/{specialty_id}",
     response_model=Specialty,
-    summary="Obtener una especialidad por su ID",
+    summary="Get a specialty by ID",
     responses={
-        404: {"description": "La especialidad no fue encontrada."},
+        404: {"description": "Specialty not found."},
     },
 )
 async def read_specialty_by_id(
@@ -63,19 +63,19 @@ async def read_specialty_by_id(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Obtiene una especialidad por su ID."""
+    """Gets a specialty by ID."""
     specialty = await crud_specialty.get_specialty(db, specialty_id=specialty_id)
     if not specialty:
-        raise HTTPException(status_code=404, detail="Especialidad no encontrada.")
+        raise HTTPException(status_code=404, detail="Specialty not found.")
     return specialty
 
 
 @router.put(
     "/{specialty_id}",
     response_model=Specialty,
-    summary="Actualizar una especialidad existente",
+    summary="Update an existing specialty",
     responses={
-        404: {"description": "La especialidad no fue encontrada."},
+        404: {"description": "Specialty not found."},
     },
 )
 async def update_specialty(
@@ -85,26 +85,26 @@ async def update_specialty(
     specialty_in: SpecialtyUpdate,
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Actualiza una especialidad existente."""
+    """Updates an existing specialty."""
     db_specialty = await crud_specialty.get_specialty(db, specialty_id=specialty_id)
     if not db_specialty:
-        raise HTTPException(status_code=404, detail="Especialidad no encontrada.")
+        raise HTTPException(status_code=404, detail="Specialty not found.")
     try:
         return await crud_specialty.update_specialty(
             db, db_specialty=db_specialty, specialty=specialty_in
         )
     except IntegrityError:
         raise HTTPException(
-            status_code=400, detail="Ya existe una especialidad con ese nombre."
+            status_code=400, detail="A specialty with that name already exists."
         )
 
 
 @router.delete(
     "/{specialty_id}",
     response_model=Specialty,
-    summary="Eliminar una especialidad",
+    summary="Delete a specialty",
     responses={
-        404: {"description": "La especialidad no fue encontrada."},
+        404: {"description": "Specialty not found."},
     },
 )
 async def delete_specialty(
@@ -113,8 +113,8 @@ async def delete_specialty(
     specialty_id: int,
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Elimina una especialidad."""
+    """Deletes a specialty."""
     specialty = await crud_specialty.delete_specialty(db, specialty_id=specialty_id)
     if not specialty:
-        raise HTTPException(status_code=404, detail="Especialidad no encontrada.")
+        raise HTTPException(status_code=404, detail="Specialty not found.")
     return specialty

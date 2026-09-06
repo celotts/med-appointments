@@ -1,4 +1,4 @@
-"""Endpoints del agente RAG y gestión de documentos vectoriales."""
+"""RAG agent endpoints and vector document management."""
 
 from typing import Any
 
@@ -26,13 +26,13 @@ router = APIRouter(prefix="/api/v1", tags=["RAG & AI Agent"])
 @router.get(
     "/rag/health",
     response_model=HealthCheck,
-    summary="Verificar estado de Ollama y pgvector",
+    summary="Check Ollama and pgvector status",
 )
 async def rag_health(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Verifica que Ollama esté accesible y cuántos documentos vectorizados hay."""
+    """Checks that Ollama is accessible and how many vectorized documents exist."""
     import httpx
 
     ollama_status = "unreachable"
@@ -59,7 +59,7 @@ async def rag_health(
     "/rag/ingest",
     response_model=DocumentoIngestResponse,
     status_code=201,
-    summary="Ingestar un documento al almacén vectorial",
+    summary="Ingest a document into the vector store",
 )
 async def ingest(
     *,
@@ -67,7 +67,7 @@ async def ingest(
     doc_in: DocumentoIngestRequest,
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Genera embedding con Ollama y guarda el documento en pgvector."""
+    """Generates embedding with Ollama and saves the document in pgvector."""
     try:
         result = await ingest_documento(
             db,
@@ -79,14 +79,14 @@ async def ingest(
         return result
     except Exception as exc:
         raise HTTPException(
-            status_code=500, detail=f"Error al ingestar documento: {exc}"
+            status_code=500, detail=f"Error ingesting document: {exc}"
         )
 
 
 @router.post(
     "/rag/ingest-nota/{cita_id}",
     status_code=201,
-    summary="Ingestar una nota médica existente al almacén vectorial",
+    summary="Ingest an existing medical note into the vector store",
 )
 async def ingest_nota_medica(
     *,
@@ -94,7 +94,7 @@ async def ingest_nota_medica(
     cita_id: int,
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Busca la nota médica de una cita y la indexa vectorialmente."""
+    """Finds the medical note of an appointment and indexes it vectorially."""
     result = await db.execute(
         text(
             "SELECT id, diagnostico, tratamiento, observaciones "
@@ -104,20 +104,20 @@ async def ingest_nota_medica(
     )
     nota = result.mappings().first()
     if not nota:
-        raise HTTPException(status_code=404, detail="Nota médica no encontrada.")
+        raise HTTPException(status_code=404, detail="Medical note not found.")
 
-    contenido_parts = [f"Diagnóstico: {nota['diagnostico']}"]
+    contenido_parts = [f"Diagnosis: {nota['diagnostico']}"]
     if nota["tratamiento"]:
-        contenido_parts.append(f"Tratamiento: {nota['tratamiento']}")
+        contenido_parts.append(f"Treatment: {nota['tratamiento']}")
     if nota["observaciones"]:
-        contenido_parts.append(f"Observaciones: {nota['observaciones']}")
+        contenido_parts.append(f"Observations: {nota['observaciones']}")
     contenido = "\n".join(contenido_parts)
 
     doc_result = await ingest_documento(
         db,
         ref_tipo="NOTA_MEDICA",
         ref_id=nota["id"],
-        titulo=f"Nota médica cita #{cita_id}",
+        titulo=f"Medical note appointment #{cita_id}",
         contenido=contenido,
     )
     return doc_result
@@ -126,7 +126,7 @@ async def ingest_nota_medica(
 @router.post(
     "/rag/search",
     response_model=list[DocumentoSearchResult],
-    summary="Buscar documentos por similitud semántica",
+    summary="Search documents by semantic similarity",
 )
 async def search(
     *,
@@ -134,20 +134,20 @@ async def search(
     search_in: DocumentoSearchRequest,
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Realiza búsqueda por embedding sobre documentos_vectoriales."""
+    """Performs embedding search over vectorized documents."""
     try:
         results = await search_documentos(
             db, search_in.query, k=search_in.k, ref_tipo=search_in.ref_tipo
         )
         return results
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error en búsqueda: {exc}")
+        raise HTTPException(status_code=500, detail=f"Search error: {exc}")
 
 
 @router.post(
     "/rag/chat",
     response_model=ChatResponse,
-    summary="Conversar con el agente MedAssist (RAG + tool calling)",
+    summary="Chat with the MedAssist agent (RAG + tool calling)",
 )
 async def chat(
     *,
@@ -155,7 +155,7 @@ async def chat(
     chat_in: ChatRequest,
     current_user: UserModel = Depends(get_current_user),
 ) -> ChatResponse:
-    """Envía un mensaje al agente que puede consultar la BD y documentos vectoriales."""
+    """Sends a message to the agent that can query the DB and vectorized documents."""
     historial = None
     if chat_in.historial:
         historial = [{"role": m.role, "content": m.content} for m in chat_in.historial]
@@ -168,4 +168,4 @@ async def chat(
         )
         return ChatResponse(respuesta=respuesta)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error del agente: {exc}")
+        raise HTTPException(status_code=500, detail=f"Agent error: {exc}")

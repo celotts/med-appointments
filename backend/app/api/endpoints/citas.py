@@ -16,7 +16,7 @@ from schemas.cita import (
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-router = APIRouter(prefix="/api/v1", tags=["Citas"])
+router = APIRouter(prefix="/api/v1", tags=["Appointments"])
 
 
 def _busy_error(exc: ValueError) -> HTTPException:
@@ -28,7 +28,7 @@ def _busy_error(exc: ValueError) -> HTTPException:
 @router.get(
     "/citas/",
     response_model=list[CitaOut],
-    summary="Obtener una lista de citas",
+    summary="Get a list of appointments",
 )
 async def read_citas(
     db: AsyncSession = Depends(get_db),
@@ -39,7 +39,7 @@ async def read_citas(
     estado: str | None = None,
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Lista de citas con filtros opcionales por paciente, médico y estado."""
+    """List of appointments with optional filters by patient, doctor, and status."""
     return await crud_cita.get_citas(
         db,
         skip=skip,
@@ -54,11 +54,11 @@ async def read_citas(
     "/citas/",
     response_model=CitaOut,
     status_code=201,
-    summary="Agendar una nueva cita",
+    summary="Schedule a new appointment",
     responses={
-        400: {"description": "Datos inválidos."},
-        404: {"description": "Paciente o médico no encontrado."},
-        409: {"description": "El médico ya tiene una cita en ese horario."},
+        400: {"description": "Invalid data."},
+        404: {"description": "Patient or doctor not found."},
+        409: {"description": "The doctor already has an appointment at that time."},
     },
 )
 async def create_cita(
@@ -67,11 +67,11 @@ async def create_cita(
     cita_in: CitaCreate,
     current_user: UserModel = Depends(get_current_user),
 ) -> CitaOut:
-    """Agenda una nueva cita en estado PENDIENTE."""
+    """Schedules a new appointment in PENDING status."""
     if not await crud_paciente.get_paciente(db, cita_in.paciente_id):
-        raise HTTPException(status_code=404, detail="Paciente no encontrado.")
+        raise HTTPException(status_code=404, detail="Patient not found.")
     if not await crud_medico.get_medico(db, cita_in.medico_id):
-        raise HTTPException(status_code=404, detail="Médico no encontrado.")
+        raise HTTPException(status_code=404, detail="Doctor not found.")
     try:
         return await crud_cita.create_cita(db, cita=cita_in)
     except ValueError as exc:
@@ -81,29 +81,29 @@ async def create_cita(
 @router.get(
     "/citas/{cita_id}",
     response_model=CitaOut,
-    summary="Obtener una cita por su ID",
-    responses={404: {"description": "La cita no fue encontrada."}},
+    summary="Get an appointment by ID",
+    responses={404: {"description": "Appointment not found."}},
 )
 async def read_cita_by_id(
     cita_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Obtiene una cita por su ID."""
+    """Gets an appointment by ID."""
     cita = await crud_cita.get_cita(db, cita_id)
     if not cita:
-        raise HTTPException(status_code=404, detail="CitaOut no encontrada.")
+        raise HTTPException(status_code=404, detail="Appointment not found.")
     return cita
 
 
 @router.put(
     "/citas/{cita_id}",
     response_model=CitaOut,
-    summary="Reagendar una cita",
+    summary="Reschedule an appointment",
     responses={
-        400: {"description": "No se puede reagendar o datos inválidos."},
-        404: {"description": "La cita no fue encontrada."},
-        409: {"description": "El médico ya tiene una cita en ese horario."},
+        400: {"description": "Cannot reschedule or invalid data."},
+        404: {"description": "Appointment not found."},
+        409: {"description": "The doctor already has an appointment at that time."},
     },
 )
 async def reagendar_cita(
@@ -113,10 +113,10 @@ async def reagendar_cita(
     cita_in: CitaUpdate,
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Reagenda una cita y la transiciona a estado REAGENDADA."""
+    """Reschedules an appointment and transitions it to RESCHEDULED status."""
     db_cita = await crud_cita.get_cita(db, cita_id)
     if not db_cita:
-        raise HTTPException(status_code=404, detail="CitaOut no encontrada.")
+        raise HTTPException(status_code=404, detail="Appointment not found.")
     try:
         return await crud_cita.reagendar_cita(db, db_cita, cita_in)
     except ValueError as exc:
@@ -126,10 +126,10 @@ async def reagendar_cita(
 @router.patch(
     "/citas/{cita_id}/estado",
     response_model=CitaOut,
-    summary="Cambiar el estado de una cita",
+    summary="Change appointment status",
     responses={
-        400: {"description": "Transición de estado inválida."},
-        404: {"description": "La cita no fue encontrada."},
+        400: {"description": "Invalid status transition."},
+        404: {"description": "Appointment not found."},
     },
 )
 async def change_cita_estado(
@@ -139,10 +139,10 @@ async def change_cita_estado(
     cambio: CitaEstadoUpdate,
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Cambia el estado de una cita siguiendo las transiciones válidas."""
+    """Changes appointment status following valid transitions."""
     db_cita = await crud_cita.get_cita(db, cita_id)
     if not db_cita:
-        raise HTTPException(status_code=404, detail="CitaOut no encontrada.")
+        raise HTTPException(status_code=404, detail="Appointment not found.")
     try:
         return await crud_cita.change_estado(db, db_cita, cambio)
     except ValueError as exc:
@@ -151,8 +151,8 @@ async def change_cita_estado(
 
 @router.delete(
     "/citas/{cita_id}",
-    summary="Eliminar una cita",
-    responses={404: {"description": "La cita no fue encontrada."}},
+    summary="Delete an appointment",
+    responses={404: {"description": "Appointment not found."}},
 )
 async def delete_cita(
     *,
@@ -160,19 +160,19 @@ async def delete_cita(
     cita_id: int,
     current_user: UserModel = Depends(get_current_user),
 ) -> dict[str, str]:
-    """Elimina una cita."""
+    """Deletes an appointment."""
     db_cita = await crud_cita.get_cita(db, cita_id)
     if not db_cita:
-        raise HTTPException(status_code=404, detail="Cita no encontrada.")
+        raise HTTPException(status_code=404, detail="Appointment not found.")
     await crud_cita.delete_cita(db, db_cita)
-    return {"detail": "Cita eliminada."}
+    return {"detail": "Appointment deleted."}
 
 
-# ---------- Notas médicas ----------
+# ---------- Medical notes ----------
 @router.get(
     "/notas/",
     response_model=list[NotaMedicaOut],
-    summary="Obtener notas médicas",
+    summary="Get medical notes",
 )
 async def read_notas(
     db: AsyncSession = Depends(get_db),
@@ -181,7 +181,7 @@ async def read_notas(
     cita_id: int | None = None,
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Lista de notas médicas, opcionalmente filtradas por cita."""
+    """List of medical notes, optionally filtered by appointment."""
     return await crud_nota_medica.get_notas(db, skip=skip, limit=limit, cita_id=cita_id)
 
 
@@ -189,10 +189,10 @@ async def read_notas(
     "/notas/",
     response_model=NotaMedicaOut,
     status_code=201,
-    summary="Crear una nota médica",
+    summary="Create a medical note",
     responses={
-        400: {"description": "La cita ya tiene una nota médica."},
-        404: {"description": "La cita no fue encontrada."},
+        400: {"description": "The appointment already has a medical note."},
+        404: {"description": "Appointment not found."},
     },
 )
 async def create_nota(
@@ -201,41 +201,41 @@ async def create_nota(
     nota_in: NotaMedicaCreate,
     current_user: UserModel = Depends(get_current_user),
 ) -> NotaMedicaOut:
-    """Crea una nota médica para una cita (una por cita)."""
+    """Creates a medical note for an appointment (one per appointment)."""
     cita = await crud_cita.get_cita(db, nota_in.cita_id)
     if not cita:
-        raise HTTPException(status_code=404, detail="CitaOut no encontrada.")
+        raise HTTPException(status_code=404, detail="Appointment not found.")
     if await crud_nota_medica.get_nota_by_cita(db, nota_in.cita_id):
-        raise HTTPException(status_code=400, detail="La cita ya tiene una nota médica.")
+        raise HTTPException(status_code=400, detail="The appointment already has a medical note.")
     try:
         return await crud_nota_medica.create_nota(db, nota=nota_in)
     except IntegrityError:
-        raise HTTPException(status_code=400, detail="La cita ya tiene una nota médica.")
+        raise HTTPException(status_code=400, detail="The appointment already has a medical note.")
 
 
 @router.get(
     "/notas/{nota_id}",
     response_model=NotaMedicaOut,
-    summary="Obtener una nota médica por su ID",
-    responses={404: {"description": "La nota no fue encontrada."}},
+    summary="Get a medical note by ID",
+    responses={404: {"description": "Medical note not found."}},
 )
 async def read_nota_by_id(
     nota_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Obtiene una nota médica por su ID."""
+    """Gets a medical note by ID."""
     nota = await crud_nota_medica.get_nota(db, nota_id)
     if not nota:
-        raise HTTPException(status_code=404, detail="Nota no encontrada.")
+        raise HTTPException(status_code=404, detail="Medical note not found.")
     return nota
 
 
 @router.put(
     "/notas/{nota_id}",
     response_model=NotaMedicaOut,
-    summary="Actualizar una nota médica",
-    responses={404: {"description": "La nota no fue encontrada."}},
+    summary="Update a medical note",
+    responses={404: {"description": "Medical note not found."}},
 )
 async def update_nota(
     *,
@@ -244,18 +244,18 @@ async def update_nota(
     nota_in: NotaMedicaUpdate,
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Actualiza una nota médica existente."""
+    """Updates an existing medical note."""
     db_nota = await crud_nota_medica.get_nota(db, nota_id)
     if not db_nota:
-        raise HTTPException(status_code=404, detail="Nota no encontrada.")
+        raise HTTPException(status_code=404, detail="Medical note not found.")
     return await crud_nota_medica.update_nota(db, db_nota, nota_in)
 
 
 @router.delete(
     "/notas/{nota_id}",
     response_model=NotaMedicaOut,
-    summary="Eliminar una nota médica",
-    responses={404: {"description": "La nota no fue encontrada."}},
+    summary="Delete a medical note",
+    responses={404: {"description": "Medical note not found."}},
 )
 async def delete_nota(
     *,
@@ -263,8 +263,8 @@ async def delete_nota(
     nota_id: int,
     current_user: UserModel = Depends(get_current_user),
 ) -> Any:
-    """Elimina una nota médica."""
+    """Deletes a medical note."""
     nota = await crud_nota_medica.delete_nota(db, nota_id)
     if not nota:
-        raise HTTPException(status_code=404, detail="Nota no encontrada.")
+        raise HTTPException(status_code=404, detail="Medical note not found.")
     return nota

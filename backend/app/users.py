@@ -15,7 +15,7 @@ router = APIRouter()
 @router.get(
     "/",
     response_model=list[User],
-    summary="Obtener una lista de usuarios",
+    summary="Get a list of users",
 )
 async def read_users(
     db: AsyncSession = Depends(dependencies.get_db),
@@ -23,7 +23,7 @@ async def read_users(
     limit: int = 100,
     current_user: UserModel = Depends(dependencies.get_current_user),
 ) -> Any:
-    """Obtiene una lista de usuarios."""
+    """Get a list of users."""
     users = await crud_user.get_users(db, skip=skip, limit=limit)
     return users
 
@@ -32,9 +32,9 @@ async def read_users(
     "/",
     response_model=User,
     status_code=201,
-    summary="Crear un nuevo usuario",
+    summary="Create a new user",
     responses={
-        400: {"description": "El email ya está registrado en el sistema."},
+        400: {"description": "The email is already registered in the system."},
     },
 )
 async def create_user(
@@ -46,17 +46,17 @@ async def create_user(
         user = await crud_user.create_user(db=db, user_in=user_in)
     except IntegrityError as exc:
         raise HTTPException(
-            status_code=400, detail="El email ya está registrado."
+            status_code=400, detail="The email is already registered."
         ) from exc
     return user
 
 
-router.get(
+@router.get(
     "/{user_id}",
     response_model=User,
-    summary="Obtener un usuario por su ID",
+    summary="Get a user by ID",
     responses={
-        404: {"description": "El usuario con el ID especificado no fue encontrado."}
+        404: {"description": "The user with the specified ID was not found."}
     },
 )
 
@@ -66,19 +66,19 @@ async def read_user_by_id(
     db: AsyncSession = Depends(dependencies.get_db),
     current_user: UserModel = Depends(dependencies.get_current_user),
 ) -> Any:
-    """Obtiene un usuario por su ID."""
+    """Get a user by ID."""
     user = await crud_user.get_user(db, user_id=user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail="User not found.")
     return user
 
 
 @router.put(
     "/{user_id}",
     response_model=User,
-    summary="Actualizar un usuario existente",
+    summary="Update an existing user",
     responses={
-        404: {"description": "El usuario con el ID especificado no fue encontrado."}
+        404: {"description": "The user with the specified ID was not found."}
     },
 )
 async def update_user(
@@ -88,10 +88,10 @@ async def update_user(
     user_in: UserUpdate,
     current_user: UserModel = Depends(dependencies.get_current_user),
 ) -> Any:
-    """Actualiza un usuario."""
+    """Update a user."""
     db_user = await crud_user.get_user(db, user_id=user_id)
     if not db_user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail="User not found.")
     user = await crud_user.update_user(db=db, db_user=db_user, user_in=user_in)
     return user
 
@@ -99,9 +99,9 @@ async def update_user(
 @router.delete(
     "/{user_id}",
     response_model=User,
-    summary="Eliminar un usuario",
+    summary="Delete a user",
     responses={
-        404: {"description": "El usuario con el ID especificado no fue encontrado."}
+        404: {"description": "The user with the specified ID was not found."}
     },
 )
 async def delete_user(
@@ -110,8 +110,8 @@ async def delete_user(
     user_id: uuid.UUID,
     current_user: UserModel = Depends(dependencies.get_current_user),
 ) -> Any:
-    """Elimina un usuario."""
+    """Delete a user."""
     user = await crud_user.remove_user(db=db, user_id=user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail="User not found.")
     return user
