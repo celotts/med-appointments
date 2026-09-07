@@ -16,7 +16,7 @@ async def get_specialties(
     db: AsyncSession, skip: int = 0, limit: int = 100
 ) -> list[SpecialtyModel]:
     result = await db.execute(
-        select(SpecialtyModel).order_by(SpecialtyModel.nombre).offset(skip).limit(limit)
+        select(SpecialtyModel).order_by(SpecialtyModel.name).offset(skip).limit(limit)
     )
     return result.scalars().all()
 
@@ -25,7 +25,7 @@ async def create_specialty(
     db: AsyncSession, specialty: SpecialtyCreateSchema
 ) -> SpecialtyModel:
     db_specialty = SpecialtyModel(
-        nombre=specialty.nombre, descripcion=specialty.descripcion
+        name=specialty.name, description=specialty.description
     )
     db.add(db_specialty)
     await db.commit()

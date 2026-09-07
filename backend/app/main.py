@@ -1,10 +1,14 @@
 from api.endpoints import (
-    citas,
-    estados_cita,
+    appointments,
+    appointment_statuses,
+    integrations,
     login,
-    medicos,
-    pacientes,
+    doctors,
+    notifications,
+    patients,
+    premium,
     rag,
+    reports,
     specialties,
     users,
 )
@@ -15,7 +19,7 @@ from initial_data import main as init_db
 app = FastAPI(
     title="Medical Appointments RAG API",
     description="API for managing medical appointments with Retrieval-Augmented Generation (RAG) capabilities.",
-    version="0.1.0",
+    version="0.2.0",
 )
 
 
@@ -31,15 +35,22 @@ def read_root():
     return {"status": "ok"}
 
 
+# Core endpoints
 app.include_router(login.router, prefix="/api/v1", tags=["Login"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
 app.include_router(
     specialties.router, prefix="/api/v1/specialties", tags=["Specialties"]
 )
-app.include_router(medicos.router, prefix="/api/v1/medicos", tags=["Doctors"])
-app.include_router(pacientes.router, prefix="/api/v1/pacientes", tags=["Patients"])
+app.include_router(doctors.router, prefix="/api/v1/doctors", tags=["Doctors"])
+app.include_router(patients.router, prefix="/api/v1/patients", tags=["Patients"])
 app.include_router(
-    estados_cita.router, prefix="/api/v1/estados-cita", tags=["Appointment Statuses"]
+    appointment_statuses.router, prefix="/api/v1/appointment-statuses", tags=["Appointment Statuses"]
 )
-app.include_router(citas.router)
+app.include_router(appointments.router)
 app.include_router(rag.router)
+
+# New endpoints
+app.include_router(notifications.router)
+app.include_router(reports.router)
+app.include_router(integrations.router)
+app.include_router(premium.router)

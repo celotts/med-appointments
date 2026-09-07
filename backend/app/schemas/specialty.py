@@ -2,8 +2,8 @@ from pydantic import BaseModel
 
 
 class SpecialtyBase(BaseModel):
-    nombre: str
-    descripcion: str | None = None
+    name: str
+    description: str | None = None
 
 
 class SpecialtyCreate(SpecialtyBase):
@@ -11,8 +11,8 @@ class SpecialtyCreate(SpecialtyBase):
 
 
 class SpecialtyUpdate(BaseModel):
-    nombre: str | None = None
-    descripcion: str | None = None
+    name: str | None = None
+    description: str | None = None
 
 
 class Specialty(SpecialtyBase):

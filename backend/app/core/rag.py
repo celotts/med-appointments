@@ -1,4 +1,4 @@
-"""Core de RAG: embeddings y búsqueda vectorial sobre documentos_vectoriales."""
+"""RAG core: embeddings and vector search over vector_documents."""
 
 from typing import Any
 
@@ -25,7 +25,7 @@ def _vector_str(vector: list[float]) -> str:
 
 
 def _get_dsn() -> str:
-    """Convierte el DSN de SQLAlchemy al formato asyncpg."""
+    """Converts the SQLAlchemy DSN to asyncpg format."""
     url = settings.DATABASE_URL
     return url.replace("postgresql+asyncpg://", "postgresql://")
 
@@ -34,69 +34,69 @@ async def _connect() -> asyncpg.Connection:
     return await asyncpg.connect(_get_dsn())
 
 
-async def ingest_documento(
+async def ingest_document(
     db: AsyncSession,
     *,
-    ref_tipo: str,
-    ref_id: int | None,
-    titulo: str,
-    contenido: str,
+    reference_type: str,
+    reference_id: int | None,
+    title: str,
+    content: str,
 ) -> dict[str, Any]:
-    """Genera embedding y guarda el documento en documentos_vectoriales."""
+    """Generates embedding and saves the document in vector_documents."""
     embeddings = _get_embeddings()
-    vector = embeddings.embed_query(contenido)
+    vector = embeddings.embed_query(content)
     vector_literal = _vector_str(vector)
 
     conn = await _connect()
     try:
         await conn.execute(
-            "INSERT INTO documentos_vectoriales (ref_tipo, ref_id, titulo, contenido, embedding) "
+            "INSERT INTO vector_documents (reference_type, reference_id, title, content, embedding) "
             "VALUES ($1, $2, $3, $4, $5::vector)",
-            ref_tipo,
-            ref_id,
-            titulo,
-            contenido,
+            reference_type,
+            reference_id,
+            title,
+            content,
             vector_literal,
         )
     finally:
         await conn.close()
 
     return {
-        "ref_tipo": ref_tipo,
-        "ref_id": ref_id,
-        "titulo": titulo,
+        "reference_type": reference_type,
+        "reference_id": reference_id,
+        "title": title,
     }
 
 
-async def search_documentos(
+async def search_documents(
     db: AsyncSession,
     query: str,
     *,
     k: int = 5,
-    ref_tipo: str | None = None,
+    reference_type: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Busca documentos por similitud coseno en documentos_vectoriales."""
+    """Searches documents by cosine similarity in vector_documents."""
     embeddings = _get_embeddings()
     query_vector = embeddings.embed_query(query)
     qv_literal = _vector_str(query_vector)
 
     conn = await _connect()
     try:
-        if ref_tipo:
+        if reference_type:
             rows = await conn.fetch(
-                "SELECT id, ref_tipo, ref_id, titulo, contenido, "
+                "SELECT id, reference_type, reference_id, title, content, "
                 "1 - (embedding <=> $1::vector) AS similarity "
-                "FROM documentos_vectoriales WHERE ref_tipo = $2 "
+                "FROM vector_documents WHERE reference_type = $2 "
                 "ORDER BY embedding <=> $1::vector LIMIT $3",
                 qv_literal,
-                ref_tipo,
+                reference_type,
                 k,
             )
         else:
             rows = await conn.fetch(
-                "SELECT id, ref_tipo, ref_id, titulo, contenido, "
+                "SELECT id, reference_type, reference_id, title, content, "
                 "1 - (embedding <=> $1::vector) AS similarity "
-                "FROM documentos_vectoriales "
+                "FROM vector_documents "
                 "ORDER BY embedding <=> $1::vector LIMIT $2",
                 qv_literal,
                 k,
@@ -107,23 +107,23 @@ async def search_documentos(
     return [
         {
             "id": r["id"],
-            "ref_tipo": r["ref_tipo"],
-            "ref_id": r["ref_id"],
-            "titulo": r["titulo"],
-            "contenido": r["contenido"][:500],
+            "reference_type": r["reference_type"],
+            "reference_id": r["reference_id"],
+            "title": r["title"],
+            "content": r["content"][:500],
             "similarity": round(float(r["similarity"]), 4),
         }
         for r in rows
     ]
 
 
-async def search_citas_por_texto(
+async def search_appointments_by_text(
     db: AsyncSession,
     query: str,
     *,
     k: int = 3,
 ) -> list[dict[str, Any]]:
-    """Busca en notas médicas usando embedding."""
+    """Searches in medical notes using embedding."""
     embeddings = _get_embeddings()
     query_vector = embeddings.embed_query(query)
     qv_literal = _vector_str(query_vector)
@@ -131,10 +131,10 @@ async def search_citas_por_texto(
     conn = await _connect()
     try:
         rows = await conn.fetch(
-            "SELECT nm.id, nm.cita_id, nm.diagnostico, nm.tratamiento, nm.observaciones, "
+            "SELECT nm.id, nm.appointment_id, nm.diagnosis, nm.treatment, nm.observations, "
             "1 - (dv.embedding <=> $1::vector) AS similarity "
-            "FROM notas_medicas nm "
-            "JOIN documentos_vectoriales dv ON dv.ref_tipo = 'NOTA_MEDICA' AND dv.ref_id = nm.id "
+            "FROM medical_notes nm "
+            "JOIN vector_documents dv ON dv.reference_type = 'MEDICAL_NOTE' AND dv.reference_id = nm.id "
             "ORDER BY dv.embedding <=> $1::vector LIMIT $2",
             qv_literal,
             k,
@@ -144,11 +144,11 @@ async def search_citas_por_texto(
 
     return [
         {
-            "nota_id": r["id"],
-            "cita_id": r["cita_id"],
-            "diagnostico": r["diagnostico"],
-            "tratamiento": r["tratamiento"],
-            "observaciones": r["observaciones"],
+            "note_id": r["id"],
+            "appointment_id": r["appointment_id"],
+            "diagnosis": r["diagnosis"],
+            "treatment": r["treatment"],
+            "observations": r["observations"],
             "similarity": round(float(r["similarity"]), 4),
         }
         for r in rows

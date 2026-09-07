@@ -28,8 +28,8 @@ class User(Base):
 
     role = relationship("Role", back_populates="users", foreign_keys=[role_id])
 
-    # --- Auditoría (gestionada por el trigger set_audit_role_id en la BD) ---
-    # Estas columnas NO se asignan desde la aplicación: la base de datos y sus
+    # --- Audit fields (managed by set_audit_role_id trigger in DB) ---
+    # These columns are NOT assigned from the application: the database and its
     # triggers son la fuente de verdad. Solo se exponen para lectura.
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime | None] = mapped_column(nullable=True)

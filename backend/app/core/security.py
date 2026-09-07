@@ -23,6 +23,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def get_password_hash(password: str) -> str:
-    # El algoritmo bcrypt tiene un límite de 72 bytes. Truncamos la contraseña
-    # para evitar un ValueError con contraseñas largas.
+    # The bcrypt algorithm has a 72-byte limit. We truncate the password
+    # to avoid a ValueError with long passwords.
     return pwd_context.hash(password.encode("utf-8")[:72])

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 
 class AuditAction(PyEnum):
-    """Acciones de auditoría, en correspondencia con el ENUM postgres audit_action."""
+    """Audit actions, corresponding to the PostgreSQL ENUM audit_action."""
 
     INSERT = "INSERT"
     UPDATE = "UPDATE"

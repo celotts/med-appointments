@@ -13,13 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def get_user(db: AsyncSession, user_id: uuid.UUID) -> UserModel | None:
-    """Obtiene un usuario por su ID."""
+    """Get a user by their ID."""
     result = await db.execute(select(UserModel).filter(UserModel.id == user_id))
     return result.scalars().first()
 
 
 async def get_user_by_email(db: AsyncSession, email: str) -> UserModel | None:
-    """Obtiene un usuario por su email."""
+    """Get a user by their email."""
     result = await db.execute(select(UserModel).filter(UserModel.email == email))
     return result.scalars().first()
 
@@ -27,7 +27,7 @@ async def get_user_by_email(db: AsyncSession, email: str) -> UserModel | None:
 async def get_users(
     db: AsyncSession, skip: int = 0, limit: int = 100
 ) -> list[UserModel]:
-    """Obtiene una lista de usuarios con paginación."""
+    """Get a paginated list of users."""
     result = await db.execute(select(UserModel).offset(skip).limit(limit))
     return result.scalars().all()
 
@@ -49,7 +49,7 @@ async def create_user(db: AsyncSession, *, user_in: UserCreateSchema) -> UserMod
         email=user_in.email,
         full_name=user_in.full_name,
         password=hashed_password,
-        # Los campos address, phone, phone2, is_active usan sus valores por defecto del modelo
+        # Fields address, phone, phone2, is_active use their model defaults
         role_id=user_in.role_id,
     )
     db.add(db_user)
@@ -61,10 +61,10 @@ async def create_user(db: AsyncSession, *, user_in: UserCreateSchema) -> UserMod
 async def update_user(
     db: AsyncSession, *, db_user: UserModel, user_in: UserUpdateSchema
 ) -> UserModel:
-    """Actualiza un usuario."""
+    """Update a user."""
     user_data = user_in.model_dump(exclude_unset=True)
 
-    # Si se proporciona una nueva contraseña, hashearla
+    # If a new password is provided, hash it
     if password := user_data.get("password"):
         hashed_password = get_password_hash(password)
         db_user.password = hashed_password
@@ -79,7 +79,7 @@ async def update_user(
 
 
 async def remove_user(db: AsyncSession, *, user_id: uuid.UUID) -> UserModel | None:
-    """Elimina un usuario por su ID."""
+    """Remove a user by their ID."""
     result = await db.execute(select(UserModel).filter(UserModel.id == user_id))
     user_to_delete = result.scalars().first()
     if user_to_delete:

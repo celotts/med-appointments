@@ -1,4 +1,4 @@
-"""Schemas para el agente RAG y documentos vectoriales."""
+"""Schemas for the RAG agent and vector documents."""
 
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
@@ -11,46 +11,46 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    historial: list[ChatMessage] | None = None
+    history: list[ChatMessage] | None = None
 
 
 class ChatResponse(BaseModel):
-    respuesta: str
+    response: str
 
 
-class DocumentoIngestRequest(BaseModel):
-    ref_tipo: str
-    ref_id: int | None = None
-    titulo: str
-    contenido: str
+class DocumentIngestRequest(BaseModel):
+    reference_type: str
+    reference_id: int | None = None
+    title: str
+    content: str
 
 
-class DocumentoIngestResponse(BaseModel):
-    ref_tipo: str
-    ref_id: int | None = None
-    titulo: str
+class DocumentIngestResponse(BaseModel):
+    reference_type: str
+    reference_id: int | None = None
+    title: str
 
 
-class DocumentoSearchRequest(BaseModel):
+class DocumentSearchRequest(BaseModel):
     query: str
-    ref_tipo: str | None = None
+    reference_type: str | None = None
     k: int = 5
 
 
-class DocumentoSearchResult(BaseModel):
+class DocumentSearchResult(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    ref_tipo: str
-    ref_id: int | None = None
-    titulo: str
-    contenido: str
+    reference_type: str
+    reference_id: int | None = None
+    title: str
+    content: str
     similarity: float
 
 
-class NotaMedicaIngestRequest(BaseModel):
-    """Ingesta automática de una nota médica existente por su cita_id."""
-    cita_id: int
+class MedicalNoteIngestRequest(BaseModel):
+    """Automatic ingestion of an existing medical note by its appointment_id."""
+    appointment_id: int
 
 
 class HealthCheck(BaseModel):

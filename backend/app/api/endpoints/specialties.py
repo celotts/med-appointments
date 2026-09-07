@@ -2,6 +2,7 @@ from typing import Any
 
 from core import crud_specialty
 from dependencies import get_current_user, get_db
+from dependencies_i18n import get_language, I18nResponse
 from fastapi import APIRouter, Depends, HTTPException
 from models.user import User as UserModel
 from schemas.specialty import Specialty, SpecialtyCreate, SpecialtyUpdate
@@ -40,14 +41,14 @@ async def create_specialty(
     db: AsyncSession = Depends(get_db),
     specialty_in: SpecialtyCreate,
     current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
 ) -> Specialty:
     """Creates a new medical specialty."""
+    i18n = I18nResponse(language)
     try:
         return await crud_specialty.create_specialty(db, specialty=specialty_in)
     except IntegrityError:
-        raise HTTPException(
-            status_code=400, detail="A specialty with that name already exists."
-        )
+        raise i18n.error("specialty_already_exists", status_code=400)
 
 
 @router.get(
@@ -62,11 +63,13 @@ async def read_specialty_by_id(
     specialty_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
 ) -> Any:
     """Gets a specialty by ID."""
+    i18n = I18nResponse(language)
     specialty = await crud_specialty.get_specialty(db, specialty_id=specialty_id)
     if not specialty:
-        raise HTTPException(status_code=404, detail="Specialty not found.")
+        raise i18n.error("specialty_not_found", status_code=404)
     return specialty
 
 
@@ -84,19 +87,19 @@ async def update_specialty(
     specialty_id: int,
     specialty_in: SpecialtyUpdate,
     current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
 ) -> Any:
     """Updates an existing specialty."""
+    i18n = I18nResponse(language)
     db_specialty = await crud_specialty.get_specialty(db, specialty_id=specialty_id)
     if not db_specialty:
-        raise HTTPException(status_code=404, detail="Specialty not found.")
+        raise i18n.error("specialty_not_found", status_code=404)
     try:
         return await crud_specialty.update_specialty(
             db, db_specialty=db_specialty, specialty=specialty_in
         )
     except IntegrityError:
-        raise HTTPException(
-            status_code=400, detail="A specialty with that name already exists."
-        )
+        raise i18n.error("specialty_already_exists", status_code=400)
 
 
 @router.delete(
@@ -112,9 +115,11 @@ async def delete_specialty(
     db: AsyncSession = Depends(get_db),
     specialty_id: int,
     current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
 ) -> Any:
     """Deletes a specialty."""
+    i18n = I18nResponse(language)
     specialty = await crud_specialty.delete_specialty(db, specialty_id=specialty_id)
     if not specialty:
-        raise HTTPException(status_code=404, detail="Specialty not found.")
+        raise i18n.error("specialty_not_found", status_code=404)
     return specialty

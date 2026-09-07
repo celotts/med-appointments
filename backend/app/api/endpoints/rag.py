@@ -5,18 +5,19 @@ from typing import Any
 
 from core.agent import chat_con_agente, chat_con_agente_stream
 from core.config import settings
-from core.rag import ingest_documento, search_documentos
+from core.rag import ingest_document, search_documents
 from dependencies import get_current_user, get_db
+from dependencies_i18n import get_language, I18nResponse
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from models.user import User as UserModel
 from schemas.rag import (
     ChatRequest,
     ChatResponse,
-    DocumentoIngestRequest,
-    DocumentoIngestResponse,
-    DocumentoSearchRequest,
-    DocumentoSearchResult,
+    DocumentIngestRequest,
+    DocumentIngestResponse,
+    DocumentSearchRequest,
+    DocumentSearchResult,
     HealthCheck,
 )
 from sqlalchemy import text
@@ -33,6 +34,7 @@ router = APIRouter(prefix="/api/v1", tags=["RAG & AI Agent"])
 async def rag_health(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
 ) -> Any:
     """Checks that Ollama is accessible and how many vectorized documents exist."""
     import httpx
@@ -46,7 +48,7 @@ async def rag_health(
     except Exception:
         pass
 
-    result = await db.execute(text("SELECT COUNT(*) FROM documentos_vectoriales"))
+    result = await db.execute(text("SELECT COUNT(*) FROM vector_documents"))
     vector_count = result.scalar() or 0
 
     return HealthCheck(
@@ -59,91 +61,95 @@ async def rag_health(
 
 @router.post(
     "/rag/ingest",
-    response_model=DocumentoIngestResponse,
+    response_model=DocumentIngestResponse,
     status_code=201,
     summary="Ingest a document into the vector store",
 )
 async def ingest(
     *,
     db: AsyncSession = Depends(get_db),
-    doc_in: DocumentoIngestRequest,
+    doc_in: DocumentIngestRequest,
     current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
 ) -> Any:
     """Generates embedding with Ollama and saves the document in pgvector."""
+    i18n = I18nResponse(language)
     try:
-        result = await ingest_documento(
+        result = await ingest_document(
             db,
-            ref_tipo=doc_in.ref_tipo,
-            ref_id=doc_in.ref_id,
-            titulo=doc_in.titulo,
-            contenido=doc_in.contenido,
+            reference_type=doc_in.reference_type,
+            reference_id=doc_in.reference_id,
+            title=doc_in.title,
+            content=doc_in.content,
         )
         return result
     except Exception as exc:
-        raise HTTPException(
-            status_code=500, detail=f"Error ingesting document: {exc}"
-        )
+        raise i18n.error("internal_error", status_code=500)
 
 
 @router.post(
-    "/rag/ingest-nota/{cita_id}",
+    "/rag/ingest-note/{appointment_id}",
     status_code=201,
     summary="Ingest an existing medical note into the vector store",
 )
-async def ingest_nota_medica(
+async def ingest_medical_note(
     *,
     db: AsyncSession = Depends(get_db),
-    cita_id: int,
+    appointment_id: int,
     current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
 ) -> Any:
     """Finds the medical note of an appointment and indexes it vectorially."""
+    i18n = I18nResponse(language)
     result = await db.execute(
         text(
-            "SELECT id, diagnostico, tratamiento, observaciones "
-            "FROM notas_medicas WHERE cita_id = :cita_id"
+            "SELECT id, diagnosis, treatment, observations "
+            "FROM medical_notes WHERE appointment_id = :appointment_id"
         ),
-        {"cita_id": cita_id},
+        {"appointment_id": appointment_id},
     )
-    nota = result.mappings().first()
-    if not nota:
-        raise HTTPException(status_code=404, detail="Medical note not found.")
+    note = result.mappings().first()
+    if not note:
+        raise i18n.error("note_not_found", status_code=404)
 
-    contenido_parts = [f"Diagnosis: {nota['diagnostico']}"]
-    if nota["tratamiento"]:
-        contenido_parts.append(f"Treatment: {nota['tratamiento']}")
-    if nota["observaciones"]:
-        contenido_parts.append(f"Observations: {nota['observaciones']}")
-    contenido = "\n".join(contenido_parts)
+    content_parts = [f"Diagnosis: {note['diagnosis']}"]
+    if note["treatment"]:
+        content_parts.append(f"Treatment: {note['treatment']}")
+    if note["observations"]:
+        content_parts.append(f"Observations: {note['observations']}")
+    content = "\n".join(content_parts)
 
-    doc_result = await ingest_documento(
+    doc_result = await ingest_document(
         db,
-        ref_tipo="NOTA_MEDICA",
-        ref_id=nota["id"],
-        titulo=f"Medical note appointment #{cita_id}",
-        contenido=contenido,
+        reference_type="MEDICAL_NOTE",
+        reference_id=note["id"],
+        title=f"Medical note appointment #{appointment_id}",
+        content=content,
     )
     return doc_result
 
 
 @router.post(
     "/rag/search",
-    response_model=list[DocumentoSearchResult],
+    response_model=list[DocumentSearchResult],
     summary="Search documents by semantic similarity",
 )
 async def search(
     *,
     db: AsyncSession = Depends(get_db),
-    search_in: DocumentoSearchRequest,
+    search_in: DocumentSearchRequest,
     current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
 ) -> Any:
     """Performs embedding search over vectorized documents."""
+    i18n = I18nResponse(language)
     try:
-        results = await search_documentos(
-            db, search_in.query, k=search_in.k, ref_tipo=search_in.ref_tipo
+        results = await search_documents(
+            db, search_in.query, k=search_in.k, reference_type=search_in.reference_type
         )
         return results
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Search error: {exc}")
+        raise i18n.error("search_error", status_code=500)
 
 
 @router.post(
@@ -156,21 +162,23 @@ async def chat(
     db: AsyncSession = Depends(get_db),
     chat_in: ChatRequest,
     current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
 ) -> ChatResponse:
     """Sends a message to the agent that can query the DB and vectorized documents."""
-    historial = None
-    if chat_in.historial:
-        historial = [{"role": m.role, "content": m.content} for m in chat_in.historial]
+    i18n = I18nResponse(language)
+    history = None
+    if chat_in.history:
+        history = [{"role": m.role, "content": m.content} for m in chat_in.history]
 
     try:
-        respuesta = await chat_con_agente(
+        response = await chat_con_agente(
             chat_in.message,
             conn_str=settings.DATABASE_URL,
-            historial=historial,
+            historial=history,
         )
-        return ChatResponse(respuesta=respuesta)
+        return ChatResponse(response=response)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Agent error: {exc}")
+        raise i18n.error("agent_error", status_code=500)
 
 
 @router.post(
@@ -182,22 +190,24 @@ async def chat_stream(
     db: AsyncSession = Depends(get_db),
     chat_in: ChatRequest,
     current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
 ) -> StreamingResponse:
     """Streams agent response token-by-token using Server-Sent Events."""
-    historial = None
-    if chat_in.historial:
-        historial = [{"role": m.role, "content": m.content} for m in chat_in.historial]
+    i18n = I18nResponse(language)
+    history = None
+    if chat_in.history:
+        history = [{"role": m.role, "content": m.content} for m in chat_in.history]
 
     async def event_generator():
         try:
             async for chunk in chat_con_agente_stream(
                 chat_in.message,
                 conn_str=settings.DATABASE_URL,
-                historial=historial,
+                historial=history,
             ):
                 yield f"data: {json.dumps({'token': chunk})}\n\n"
             yield f"data: {json.dumps({'done': True})}\n\n"
         except Exception as exc:
-            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+            yield f"data: {json.dumps({'error': i18n.get('agent_error')})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
