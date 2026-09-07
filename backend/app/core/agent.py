@@ -98,6 +98,9 @@ FEATURES ÚNICOS DE DIFERENCIACIÓN:
 - detectar_anomalias: Identificar patrones inusuales
 - scheduling_adaptativo: Aprender y mejorar automáticamente
 
+RESOLUCIÓN DE CONFLICTOS:
+- resolver_conflicto_cirugia: Gestión automática cuando médico tiene cirugía (reasignar + notificar)
+
 REGLAS:
 - Sé conciso y profesional.
 - Si no tienes suficiente información, indica qué dato falta.
@@ -2959,6 +2962,314 @@ async def scheduling_adaptativo(medico_id: int) -> str:
     )
 
 
+# ============================================================================
+# AGENDA IA: RESOLUCIÓN DE CONFLICTOS POR CIRUGÍA
+# ============================================================================
+
+
+@tool
+async def resolver_conflicto_cirugia(
+    medico_id: int,
+    fecha_cirugia: str,
+    hora_inicio: str = "08:00",
+    hora_fin: str = "14:00",
+    confirmado: bool = False,
+) -> str:
+    """Resuelve automáticamente el conflicto cuando un médico tiene cirugía programada.
+
+    PASOS:
+    1. Identifica todas las citas afectadas en el horario de cirugía
+    2. Busca médicos de la misma especialidad disponibles
+    3. Sugiere reasignación automática o reagendamiento
+    4. Genera notificaciones personalizadas para cada paciente
+    5. Ejecuta la acción confirmada
+
+    Args:
+        medico_id: ID del médico que tendrá la cirugía.
+        fecha_cirugia: Fecha de la cirugía (YYYY-MM-DD).
+        hora_inicio: Hora inicio de la cirugía (default 08:00).
+        hora_fin: Hora fin de la cirugía (default 14:00).
+        confirmado: Si True, ejecuta la reasignación automáticamente.
+    """
+    from datetime import datetime, timedelta
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        # 1. Get doctor info
+        result_med = await db.execute(
+            text(
+                """
+                SELECT m.id, m.nombre, m.apellido, m.especialidad_id,
+                       e.nombre AS especialidad
+                FROM medicos m
+                JOIN especialidades e ON e.id = m.especialidad_id
+                WHERE m.id = :medico_id
+                """
+            ),
+            {"medico_id": medico_id},
+        )
+        medico = result_med.mappings().first()
+
+        if not medico:
+            await engine.dispose()
+            return f"No se encontró el médico {medico_id}."
+
+        # 2. Find affected appointments
+        fecha_dt = datetime.strptime(fecha_cirugia, "%Y-%m-%d")
+        inicio_dt = fecha_dt.replace(hour=int(hora_inicio.split(":")[0]), minute=int(hora_inicio.split(":")[1]))
+        fin_dt = fecha_dt.replace(hour=int(hora_fin.split(":")[0]), minute=int(hora_fin.split(":")[1]))
+
+        result_citas = await db.execute(
+            text(
+                """
+                SELECT c.id, c.paciente_id, c.fecha_hora_inicio, c.fecha_hora_fin,
+                       c.motivo_consulta,
+                       CONCAT(p.nombre, ' ', p.apellido) AS paciente,
+                       p.email, p.telefono
+                FROM citas c
+                JOIN pacientes p ON p.id = c.paciente_id
+                JOIN estados_cita ec ON ec.id = c.estado_id
+                WHERE c.medico_id = :medico_id
+                  AND DATE(c.fecha_hora_inicio) = :fecha
+                  AND c.fecha_hora_inicio < :hora_fin
+                  AND c.fecha_hora_fin > :hora_inicio
+                  AND ec.codigo NOT IN ('CANCELADA', 'COMPLETADA')
+                ORDER BY c.fecha_hora_inicio
+                """
+            ),
+            {
+                "medico_id": medico_id,
+                "fecha": fecha_cirugia,
+                "hora_inicio": inicio_dt,
+                "hora_fin": fin_dt,
+            },
+        )
+        citas_afectadas = result_citas.mappings().all()
+
+        # 3. Find alternative doctors (same specialty)
+        result_alt = await db.execute(
+            text(
+                """
+                SELECT m.id, CONCAT(m.nombre, ' ', m.apellido) AS nombre,
+                       COUNT(c.id) AS citas_ocupadas
+                FROM medicos m
+                LEFT JOIN citas c ON c.medico_id = m.id
+                    AND DATE(c.fecha_hora_inicio) = :fecha
+                    AND c.fecha_hora_inicio < :hora_fin
+                    AND c.fecha_hora_fin > :hora_inicio
+                JOIN estados_cita ec ON ec.id = c.estado_id
+                    AND ec.codigo NOT IN ('CANCELADA', 'SUSPENDIDA')
+                WHERE m.especialidad_id = :especialidad_id
+                  AND m.id != :medico_id
+                GROUP BY m.id, m.nombre, m.apellido
+                ORDER BY citas_ocupadas ASC
+                LIMIT 3
+                """
+            ),
+            {
+                "especialidad_id": medico["especialidad_id"],
+                "medico_id": medico_id,
+                "fecha": fecha_cirugia,
+                "hora_inicio": inicio_dt,
+                "hora_fin": fin_dt,
+            },
+        )
+        doctores_alternativos = result_alt.mappings().all()
+
+        # 4. Get cancel state
+        result_estado = await db.execute(
+            text("SELECT id FROM estados_cita WHERE codigo = 'CANCELADA'")
+        )
+        estado_cancel = result_estado.first()
+    await engine.dispose()
+
+    # Build response
+    citas_info = []
+    for c in citas_afectadas:
+        citas_info.append({
+            "cita_id": c["id"],
+            "paciente": c["paciente"],
+            "email": c["email"],
+            "telefono": c["telefono"],
+            "hora": str(c["fecha_hora_inicio"]),
+            "motivo": c["motivo_consulta"][:100] if c["motivo_consulta"] else "N/A",
+        })
+
+    alternativas = []
+    for doc in doctores_alternativos:
+        alternativas.append({
+            "medico_id": doc["id"],
+            "nombre": doc["nombre"],
+            "citas_en_horario": doc["citas_ocupadas"],
+        })
+
+    if not confirmado:
+        return json.dumps(
+            {
+                "accion": "resolver_conflicto_cirugia",
+                "estado": "PENDIENTE_CONFIRMACION",
+                "medico": f"{medico['nombre']} {medico['apellido']}",
+                "especialidad": medico["especialidad"],
+                "cirugia": {
+                    "fecha": fecha_cirugia,
+                    "horario": f"{hora_inicio} - {hora_fin}",
+                },
+                "citas_afectadas": len(citas_afectadas),
+                "detalles_citas": citas_info,
+                "doctores_alternativos": alternativas,
+                "opciones": [
+                    "REASIGNAR: Mover pacientes a otro médico disponible",
+                    "REAGENDAR: Cambiar citas a otro día",
+                    "CANCELAR: Cancelar con notificación",
+                ],
+                "mensaje": "Confirme con confirmado=true para ejecutar reasignación automática.",
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    # 5. Execute: Reassign to alternative doctor or reschedule
+    engine2 = create_async_engine(_conn_str)
+    async_session2 = async_sessionmaker(engine2, expire_on_commit=False)
+
+    resultados = []
+    for cita in citas_afectadas:
+        doctor_asignado = None
+        nueva_hora = None
+
+        # Try to find alternative doctor with available slot
+        if doctores_alternativos:
+            for doc in doctores_alternativos:
+                # Check if doctor has free slot at same time
+                async with async_session2() as db_check:
+                    result_free = await db_check.execute(
+                        text(
+                            """
+                            SELECT COUNT(*) AS conflicts
+                            FROM citas c
+                            JOIN estados_cita ec ON ec.id = c.estado_id
+                            WHERE c.medico_id = :medico_id
+                              AND c.fecha_hora_inicio < :fin
+                              AND c.fecha_hora_fin > :inicio
+                              AND ec.codigo NOT IN ('CANCELADA', 'SUSPENDIDA')
+                            """
+                        ),
+                        {
+                            "medico_id": doc["id"],
+                            "inicio": cita["fecha_hora_inicio"],
+                            "fin": cita["fecha_hora_fin"],
+                        },
+                    )
+                    conflicts = result_free.scalar()
+
+                    if conflicts == 0:
+                        doctor_asignado = doc
+                        nueva_hora = cita["fecha_hora_inicio"]
+                        break
+
+        async with async_session2() as db_update:
+            if doctor_asignado:
+                # Reassign to alternative doctor
+                await db_update.execute(
+                    text(
+                        """
+                        UPDATE citas
+                        SET medico_id = :nuevo_medico,
+                            estado_id = (SELECT id FROM estados_cita WHERE codigo = 'CONFIRMADA')
+                        WHERE id = :cita_id
+                        """
+                    ),
+                    {"nuevo_medico": doctor_asignado["id"], "cita_id": cita["id"]},
+                )
+                resultados.append({
+                    "cita_id": cita["id"],
+                    "paciente": cita["paciente"],
+                    "accion": "REASIGNADA",
+                    "nuevo_medico": doctor_asignado["nombre"],
+                    "hora_mantenida": str(nueva_hora),
+                })
+            else:
+                # Cancel and add to waitlist
+                await db_update.execute(
+                    text(
+                        """
+                        UPDATE citas
+                        SET estado_id = (SELECT id FROM estados_cita WHERE codigo = 'CANCELADA')
+                        WHERE id = :cita_id
+                        """
+                    ),
+                    {"cita_id": cita["id"]},
+                )
+                # Add to waitlist
+                await db_update.execute(
+                    text(
+                        """
+                        INSERT INTO lista_espera (paciente_id, medico_id, fecha_preferida, motivo)
+                        VALUES (:paciente_id, :medico_id, :fecha, :motivo)
+                        """
+                    ),
+                    {
+                        "paciente_id": cita["paciente_id"],
+                        "medico_id": medico_id,
+                        "fecha": (fecha_dt + timedelta(days=1)).strftime("%Y-%m-%d"),
+                        "motivo": f"Cita cancelada por cirugía del médico original",
+                    },
+                )
+                resultados.append({
+                    "cita_id": cita["id"],
+                    "paciente": cita["paciente"],
+                    "accion": "CANCELADA_LISTA_ESPERA",
+                    "razon": "Sin médico alternativo disponible",
+                })
+
+        await db_update.commit()
+    await engine2.dispose()
+
+    # Generate notification messages
+    notificaciones = []
+    for r in resultados:
+        if r["accion"] == "REASIGNADA":
+            notificaciones.append({
+                "paciente": r["paciente"],
+                "mensaje": (
+                    f"Estimado/a {r['paciente']}, su cita ha sido reasignada al "
+                    f"Dr./Dra. {r['nuevo_medico']} el {r.get('hora_mantenida', fecha_cirugia)}. "
+                    f"Disculpe las molestias."
+                ),
+                "canal": "SMS + Email",
+            })
+        else:
+            notificaciones.append({
+                "paciente": r["paciente"],
+                "mensaje": (
+                    f"Estimado/a {r['paciente']}, lamentamos informarle que su cita del "
+                    f"{fecha_cirugia} ha sido cancelada por motivos médicos. "
+                    f"Ha sido agregado a nuestra lista de espera y le notificaremos pronto."
+                ),
+                "canal": "SMS + Email + Llamada",
+            })
+
+    return json.dumps(
+        {
+            "accion": "resolver_conflicto_cirugia",
+            "estado": "EJECUTADA",
+            "medico": f"{medico['nombre']} {medico['apellido']}",
+            "cirugia": f"{fecha_cirugia} {hora_inicio}-{hora_fin}",
+            "citas_procesadas": len(resultados),
+            "reasignadas": sum(1 for r in resultados if r["accion"] == "REASIGNADA"),
+            "canceladas_espera": sum(1 for r in resultados if "LISTA_ESPERA" in r["accion"]),
+            "resultados": resultados,
+            "notificaciones_generadas": notificaciones,
+            "mensaje": f"Conflicto resuelto: {len(resultados)} citas procesadas.",
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
 _TOOLS = [
     # Basic tools
     buscar_en_documentos,
@@ -3000,6 +3311,8 @@ _TOOLS = [
     resumen_clinico_paciente,
     detectar_anomalias,
     scheduling_adaptativo,
+    # Surgery conflict resolution
+    resolver_conflicto_cirugia,
 ]
 
 
