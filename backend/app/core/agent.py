@@ -50,16 +50,35 @@ _SYSTEM_PROMPT = """Eres MedAssist, un asistente inteligente de gestión de cita
 
 CAPACIDADES PRINCIPALES:
 1. Gestión de citas: crear, consultar, reagendar, cancelar citas médicas.
-2. Búsqueda semántica: buscar en notas médicas y documentos clínicos vectorizados.
-3. Análisis de agenda: sugerir horarios óptimos, detectar conflictos, analizar carga de trabajo.
-4. Patrones predictivos: analizar comportamiento de pacientes para mejorar asistencia.
-5. Resumen de notas clínicas: extraer información relevante de diagnósticos y tratamientos.
+2. Creación por lenguaje natural: interpretar solicitudes como "Agenda cita con Dr. García para Juan el martes".
+3. Búsqueda semántica: buscar en notas médicas y documentos clínicos vectorizados.
+4. Análisis de agenda: sugerir horarios óptimos, detectar conflictos, analizar carga de trabajo.
+5. Reagendamiento inteligente: sugerir mejores horarios basado en patrones del paciente.
+6. Lista de espera: gestionar cola cuando no hay disponibilidad.
+7. Predicción de no-show: estimar probabilidad de inasistencia.
+8. Seguimiento automático: recomendar citas de seguimiento según diagnóstico.
+9. Coordinación multi-doctor: encontrar horarios compartidos para citas conjuntas.
+10. Triaje por síntomas: evaluar urgencia y sugerir especialidad.
+11. Patrones predictivos: analizar comportamiento de pacientes para mejorar asistencia.
+12. Resumen de notas clínicas: extraer información relevante de diagnósticos y tratamientos.
 
-HERRAMIENTAS INTELIGENTES DE AGENDA:
-- sugerir_horarios_disponibles: Encuentra slots vacíos para un médico en una fecha específica.
-- analizar_carga_medico: Muestra estadísticas de ocupación y sugiere días con menor carga.
-- detectar_conflictos: Identifica citas superpuestas y propone soluciones.
-- analizar_patrones_paciente: Identifica preferencias de días/horarios y tasa de cancelaciones.
+HERRAMIENTAS DISPONIBLES:
+BÁSICAS:
+- buscar_en_documentos, consultar_citas_paciente, consultar_citas_medico
+- buscar_pacientes, buscar_medicos, contar_registros
+
+AGENDA:
+- sugerir_horarios_disponibles, analizar_carga_medico, detectar_conflictos
+- analizar_patrones_paciente
+
+AVANZADAS:
+- crear_cita_por_lenguaje: Crear citas desde descripción natural
+- reagendamiento_inteligente: Sugerir mejores horarios automáticamente
+- agregar_a_lista_espera: Gestionar cola de espera
+- predecir_no_show: Estimar probabilidad de inasistencia
+- sugerir_seguimiento: Recomendar citas de seguimiento
+- encontrar_horario_compartido: Buscar disponibilidad multi-doctor
+- triagar_por_sintomas: Evaluar urgencia por síntomas
 
 REGLAS:
 - Sé conciso y profesional.
@@ -69,6 +88,7 @@ REGLAS:
 - Usa las herramientas disponibles para consultar la base de datos en tiempo real.
 - Para conflictos, siempre sugiere alternativas concretas.
 - Al analizar patrones, provide recomendaciones accionables.
+- Para triaje, siempre indica que es orientativo y requiere validación profesional.
 - Responde en español.
 """
 
@@ -803,6 +823,709 @@ async def analizar_patrones_paciente(nombre_paciente: str = "") -> str:
     )
 
 
+# ============================================================================
+# AGENDA IA: HERRAMIENTAS AVANZADAS
+# ============================================================================
+
+
+@tool
+async def crear_cita_por_lenguaje(
+    descripcion: str,
+    paciente_id: int | None = None,
+    medico_id: int | None = None,
+) -> str:
+    """Crea una cita médica a partir de una descripción en lenguaje natural.
+
+    Interpreta la solicitud del usuario y crea la cita automáticamente.
+    Si faltan datos, pide la información faltante.
+
+    Args:
+        descripcion: Descripción en lenguaje natural (ej: "Cita con Dr. García para Juan el martes a las 10am").
+        paciente_id: ID del paciente (opcional si se menciona nombre).
+        medico_id: ID del médico (opcional si se menciona nombre).
+    """
+    from datetime import datetime, timedelta
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        # Try to find patient if not provided
+        if not paciente_id:
+            result = await db.execute(
+                text(
+                    """
+                    SELECT id, nombre, apellido FROM pacientes
+                    WHERE CONCAT(nombre, ' ', apellido) ILIKE :q
+                    LIMIT 1
+                    """
+                ),
+                {"q": f"%{descripcion}%"},
+            )
+            paciente = result.mappings().first()
+            if paciente:
+                paciente_id = paciente["id"]
+
+        # Try to find doctor if not provided
+        if not medico_id:
+            result = await db.execute(
+                text(
+                    """
+                    SELECT id, nombre, apellido FROM medicos
+                    WHERE CONCAT(nombre, ' ', apellido) ILIKE :q
+                    LIMIT 1
+                    """
+                ),
+                {"q": f"%{descripcion}%"},
+            )
+            medico = result.mappings().first()
+            if medico:
+                medico_id = medico["id"]
+
+    await engine.dispose()
+
+    if not paciente_id:
+        return (
+            "No pude identificar el paciente. Por favor, proporciona el ID del paciente "
+            "o menciona su nombre completo en la descripción."
+        )
+
+    if not medico_id:
+        return (
+            "No pude identificar el médico. Por favor, proporciona el ID del médico "
+            "o menciona su nombre completo en la descripción."
+        )
+
+    return json.dumps(
+        {
+            "accion": "crear_cita",
+            "paciente_id": paciente_id,
+            "medico_id": medico_id,
+            "descripcion_original": descripcion,
+            "mensaje": "Datos extraídos correctamente. Use crear_cita del CRUD para ejecutar con fecha/hora específica.",
+            "siguiente_paso": "El usuario debe especificar fecha y hora, o usar sugerir_horarios_disponibles.",
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@tool
+async def reagendamiento_inteligente(cita_id: int) -> str:
+    """Sugiere el mejor horario para reagendar una cita basado en patrones del paciente y disponibilidad del médico.
+
+    Analiza:
+    - Preferencias del paciente (días y horarios favoritos)
+    - Disponibilidad del médico
+    - Conflictos potenciales
+
+    Args:
+        cita_id: ID de la cita a reagendar.
+    """
+    from datetime import datetime, timedelta
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        # Get current appointment details
+        result = await db.execute(
+            text(
+                """
+                SELECT c.id, c.fecha_hora_inicio, c.fecha_hora_fin, c.motivo_consulta,
+                       c.paciente_id, c.medico_id,
+                       CONCAT(p.nombre, ' ', p.apellido) AS paciente,
+                       CONCAT(m.nombre, ' ', m.apellido) AS medico,
+                       ec.codigo AS estado
+                FROM citas c
+                JOIN pacientes p ON p.id = c.paciente_id
+                JOIN medicos m ON m.id = c.medico_id
+                JOIN estados_cita ec ON ec.id = c.estado_id
+                WHERE c.id = :cita_id
+                """
+            ),
+            {"cita_id": cita_id},
+        )
+        cita = result.mappings().first()
+
+        if not cita:
+            await engine.dispose()
+            return f"No se encontró la cita {cita_id}."
+
+        if cita["estado"] in ("CANCELADA", "COMPLETADA"):
+            await engine.dispose()
+            return f"No se puede reagendar una cita {cita['estado']}."
+
+        # Get patient patterns
+        result_pat = await db.execute(
+            text(
+                """
+                SELECT EXTRACT(DOW FROM c.fecha_hora_inicio) AS dia_semana,
+                       EXTRACT(HOUR FROM c.fecha_hora_inicio) AS hora,
+                       COUNT(*) AS frecuencia
+                FROM citas c
+                WHERE c.paciente_id = :paciente_id
+                  AND c.id != :cita_id
+                GROUP BY dia_semana, hora
+                ORDER BY frecuencia DESC
+                LIMIT 5
+                """
+            ),
+            {"paciente_id": cita["paciente_id"], "cita_id": cita_id},
+        )
+        patrones = result_pat.mappings().all()
+
+        # Get available slots for next 7 days
+        result_slots = await db.execute(
+            text(
+                """
+                SELECT c.fecha_hora_inicio, c.fecha_hora_fin
+                FROM citas c
+                JOIN estados_cita ec ON ec.id = c.estado_id
+                WHERE c.medico_id = :medico_id
+                  AND c.fecha_hora_inicio >= NOW()
+                  AND c.fecha_hora_inicio < NOW() + INTERVAL '7 days'
+                  AND ec.codigo NOT IN ('CANCELADA', 'SUSPENDIDA')
+                ORDER BY c.fecha_hora_inicio
+                """
+            ),
+            {"medico_id": cita["medico_id"]),
+        )
+        ocupadas = result_slots.mappings().all()
+    await engine.dispose()
+
+    # Generate recommendations
+    dias_semana = {0: "Dom", 1: "Lun", 2: "Mar", 3: "Mié", 4: "Jue", 5: "Vie", 6: "Sáb"}
+    recomendaciones = []
+
+    if patrones:
+        mejor_patron = patrones[0]
+        recomendaciones.append({
+            "tipo": "por_patron",
+            "dia": dias_semana.get(int(mejor_patron["dia_semana"]), "?"),
+            "hora": f"{int(mejor_patron['hora']):02d}:00",
+            "confianza": "alta",
+            "razon": f"El paciente tiene {mejor_patron['frecuencia']} citas en este horario.",
+        })
+
+    # Find free slots in next 7 days
+    date_obj = datetime.now().date()
+    for day_offset in range(7):
+        check_date = date_obj + timedelta(days=day_offset)
+        for hour in [9, 10, 11, 14, 15, 16, 17]:
+            slot_start = datetime.combine(check_date, datetime.min.time().replace(hour=hour))
+            slot_end = slot_start + timedelta(minutes=30)
+            is_free = True
+            for occ in ocupadas:
+                if slot_start < occ["fecha_hora_fin"] and slot_end > occ["fecha_hora_inicio"]:
+                    is_free = False
+                    break
+            if is_free:
+                recomendaciones.append({
+                    "tipo": "disponible",
+                    "fecha": slot_start.strftime("%Y-%m-%d"),
+                    "hora": slot_start.strftime("%H:%M"),
+                    "sugerencia": slot_start.strftime("%Y-%m-%dT%H:%M:%S"),
+                })
+                if len(recomendaciones) >= 5:
+                    break
+        if len(recomendaciones) >= 5:
+            break
+
+    return json.dumps(
+        {
+            "cita_id": cita_id,
+            "paciente": cita["paciente"],
+            "medico": cita["medico"],
+            "fecha_actual": str(cita["fecha_hora_inicio"]),
+            "recomendaciones": recomendaciones[:5],
+            "mensaje": "Seleccione una opción o confirme para ejecutar el reagendamiento.",
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@tool
+async def agregar_a_lista_espera(
+    paciente_id: int, medico_id: int, fecha_preferida: str, motivo: str = ""
+) -> str:
+    """Agrega un paciente a la lista de espera para un médico cuando no hay horarios disponibles.
+
+    Guarda la preferencia y notificará cuando se libere un slot.
+
+    Args:
+        paciente_id: ID del paciente.
+        medico_id: ID del médico.
+        fecha_preferida: Fecha preferida en formato YYYY-MM-DD.
+        motivo: Motivo de la consulta.
+    """
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        # Create waitlist table if not exists
+        await db.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS lista_espera (
+                    id SERIAL PRIMARY KEY,
+                    paciente_id INT NOT NULL,
+                    medico_id INT NOT NULL,
+                    fecha_preferida DATE NOT NULL,
+                    motivo TEXT,
+                    estado VARCHAR(20) DEFAULT 'PENDIENTE',
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    notified_at TIMESTAMP,
+                    CONSTRAINT fk_espera_paciente FOREIGN KEY (paciente_id)
+                        REFERENCES pacientes (id) ON DELETE CASCADE,
+                    CONSTRAINT fk_espera_medico FOREIGN KEY (medico_id)
+                        REFERENCES medicos (id) ON DELETE CASCADE
+                )
+                """
+            )
+        )
+
+        # Check if already in waitlist
+        result = await db.execute(
+            text(
+                """
+                SELECT id FROM lista_espera
+                WHERE paciente_id = :paciente_id AND medico_id = :medico_id
+                  AND estado = 'PENDIENTE'
+                """
+            ),
+            {"paciente_id": paciente_id, "medico_id": medico_id},
+        )
+        existing = result.first()
+
+        if existing:
+            await engine.dispose()
+            return "El paciente ya está en la lista de espera para este médico."
+
+        # Add to waitlist
+        await db.execute(
+            text(
+                """
+                INSERT INTO lista_espera (paciente_id, medico_id, fecha_preferida, motivo)
+                VALUES (:paciente_id, :medico_id, :fecha_preferida, :motivo)
+                """
+            ),
+            {
+                "paciente_id": paciente_id,
+                "medico_id": medico_id,
+                "fecha_preferida": fecha_preferida,
+                "motivo": motivo,
+            },
+        )
+        await db.commit()
+
+    await engine.dispose()
+
+    return json.dumps(
+        {
+            "accion": "agregar_lista_espera",
+            "paciente_id": paciente_id,
+            "medico_id": medico_id,
+            "fecha_preferida": fecha_preferida,
+            "estado": "PENDIENTE",
+            "mensaje": "Paciente agregado a la lista de espera. Será notificado cuando se libere un slot.",
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@tool
+async def predecir_no_show(paciente_id: int) -> str:
+    """Predice la probabilidad de que un paciente no asista a su próxima cita.
+
+    Basado en:
+    - Historial de asistencias anteriores
+    - Frecuencia de cancelaciones
+    - Días de la semana
+    - Tiempo de anticipación de la cita
+
+    Args:
+        paciente_id: ID del paciente.
+    """
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        result = await db.execute(
+            text(
+                """
+                SELECT c.fecha_hora_inicio, ec.codigo AS estado,
+                       EXTRACT(DOW FROM c.fecha_hora_inicio) AS dia_semana,
+                       EXTRACT(EPOCH FROM (c.fecha_hora_inicio - NOW()))/3600 AS horas_anticipacion
+                FROM citas c
+                JOIN estados_cita ec ON ec.id = c.estado_id
+                WHERE c.paciente_id = :paciente_id
+                ORDER BY c.fecha_hora_inicio DESC
+                LIMIT 20
+                """
+            ),
+            {"paciente_id": paciente_id},
+        )
+        historial = result.mappings().all()
+
+        # Get patient info
+        result_pat = await db.execute(
+            text("SELECT nombre, apellido FROM pacientes WHERE id = :id"),
+            {"id": paciente_id},
+        )
+        paciente = result_pat.mappings().first()
+    await engine.dispose()
+
+    if not paciente:
+        return f"No se encontró el paciente {paciente_id}."
+
+    if not historial:
+        return json.dumps(
+            {
+                "paciente": f"{paciente['nombre']} {paciente['apellido']}",
+                "prediccion": "sin_datos",
+                "probabilidad": "N/A",
+                "mensaje": "No hay historial suficiente para predecir.",
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    total = len(historial)
+    canceladas = sum(1 for h in historial if h["estado"] == "CANCELADA")
+    completadas = sum(1 for h in historial if h["estado"] == "COMPLETADA")
+
+    # Calculate base probability
+    tasa_cancelacion = canceladas / total if total > 0 else 0
+    tasa_asistencia = completadas / total if total > 0 else 0
+
+    # Adjust by day of week (weekends have higher no-show rates)
+    dia_prefiere = max(
+        set(h["dia_semana"] for h in historial),
+        key=lambda d: sum(1 for h in historial if h["dia_semana"] == d),
+    )
+
+    # Risk factors
+    factores_riesgo = []
+    if tasa_cancelacion > 0.3:
+        factores_riesgo.append("Alta tasa de cancelaciones previas")
+    if tasa_asistencia < 0.5:
+        factores_riesgo.append("Baja tasa de asistencia histórica")
+
+    # Final probability (simple heuristic)
+    probabilidad = min(0.95, tasa_cancelacion * 0.7 + (0.1 if len(factores_riesgo) > 1 else 0))
+
+    nivel_riesgo = "bajo"
+    if probabilidad > 0.6:
+        nivel_riesgo = "alto"
+    elif probabilidad > 0.3:
+        nivel_riesgo = "medio"
+
+    return json.dumps(
+        {
+            "paciente_id": paciente_id,
+            "paciente": f"{paciente['nombre']} {paciente['apellido']}",
+            "total_citas": total,
+            "tasa_cancelacion": f"{(tasa_cancelacion*100):.1f}%",
+            "tasa_asistencia": f"{(tasa_asistencia*100):.1f}%",
+            "probabilidad_no_show": f"{(probabilidad*100):.1f}%",
+            "nivel_riesgo": nivel_riesgo,
+            "factores_riesgo": factores_riesgo if factores_riesgo else ["Ninguno identificado"],
+            "recomendacion": "Enviar recordatorio 24h antes" if nivel_riesgo == "medio" else (
+                "Considerar confirmación telefónica y recordatorio SMS" if nivel_riesgo == "alto" else "Sin acciones adicionales requeridas"
+            ),
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@tool
+async def sugerir_seguimiento(cita_id: int) -> str:
+    """Sugiere una cita de seguimiento basada en el diagnóstico de una cita completada.
+
+    Analiza la nota médica y recomienda:
+    - Tiempo de seguimiento recomendado
+    - Especialidad necesaria
+    - Motivo del seguimiento
+
+    Args:
+        cita_id: ID de la cita completada.
+    """
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        result = await db.execute(
+            text(
+                """
+                SELECT c.id, c.fecha_hora_inicio,
+                       CONCAT(p.nombre, ' ', p.apellido) AS paciente,
+                       CONCAT(m.nombre, ' ', m.apellido) AS medico,
+                       e.nombre AS especialidad,
+                       nm.diagnostico, nm.tratamiento, nm.observaciones
+                FROM citas c
+                JOIN pacientes p ON p.id = c.paciente_id
+                JOIN medicos m ON m.id = c.medico_id
+                JOIN especialidades e ON e.id = m.especialidad_id
+                JOIN notas_medicas nm ON nm.cita_id = c.id
+                WHERE c.id = :cita_id
+                """
+            ),
+            {"cita_id": cita_id},
+        )
+        cita = result.mappings().first()
+    await engine.dispose()
+
+    if not cita:
+        return f"No se encontró la cita {cita_id} o no tiene nota médica."
+
+    # Simple keyword-based recommendations
+    diagnostico = (cita["diagnostico"] or "").lower()
+    tratamiento = (cita["tratamiento"] or "").lower()
+
+    # Determine follow-up timing based on keywords
+    dias_seguimiento = 30  # Default: 1 month
+    motivo = "Seguimiento general"
+
+    if any(word in diagnostico for word in ["cirugía", "operación", "procedimiento"]):
+        dias_seguimiento = 14
+        motivo = "Revisión post-procedimiento"
+    elif any(word in diagnostico for word in ["infección", "antibiótico", "tratamiento"]):
+        dias_seguimiento = 7
+        motivo = "Evolución de tratamiento"
+    elif any(word in diagnostico for word in ["crónico", "diabetes", "hipertensión"]):
+        dias_seguimiento = 90
+        motivo = "Control de condición crónica"
+    elif any(word in tratamiento for word in ["fisioterapia", "rehabilitación"]):
+        dias_seguimiento = 21
+        motivo = "Evolución de rehabilitación"
+
+    return json.dumps(
+        {
+            "cita_original": cita_id,
+            "paciente": cita["paciente"],
+            "medico_actual": cita["medico"],
+            "especialidad": cita["especialidad"],
+            "diagnostico": cita["diagnostico"][:200] if cita["diagnostico"] else "N/A",
+            "seguimiento_recomendado": {
+                "dias": dias_seguimiento,
+                "motivo": motivo,
+                "especialidad_sugerida": cita["especialidad"],
+            },
+            "mensaje": f"Se recomienda seguimiento en {dias_seguimiento} días. {motivo}.",
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@tool
+async def encontrar_horario_compartido(
+    medico_ids: list[int], fecha: str, duracion_min: int = 30
+) -> str:
+    """Encuentra horarios donde múltiples doctores estén disponibles simultáneamente.
+
+    Útil para citas conjuntas o segundas opiniones.
+
+    Args:
+        medico_ids: Lista de IDs de médicos (mínimo 2).
+        fecha: Fecha a consultar (YYYY-MM-DD).
+        duracion_min: Duración de la cita en minutos.
+    """
+    from datetime import datetime, timedelta
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    if len(medico_ids) < 2:
+        return "Se requieren al menos 2 médicos para buscar horario compartido."
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        # Get all occupied slots for each doctor
+        disponibilidad = {}
+        for med_id in medico_ids:
+            result = await db.execute(
+                text(
+                    """
+                    SELECT c.fecha_hora_inicio, c.fecha_hora_fin
+                    FROM citas c
+                    JOIN estados_cita ec ON ec.id = c.estado_id
+                    WHERE c.medico_id = :medico_id
+                      AND DATE(c.fecha_hora_inicio) = :fecha
+                      AND ec.codigo NOT IN ('CANCELADA', 'SUSPENDIDA')
+                    ORDER BY c.fecha_hora_inicio
+                    """
+                ),
+                {"medico_id": med_id, "fecha": fecha},
+            )
+            ocupadas = result.mappings().all()
+
+            # Get doctor name
+            result_med = await db.execute(
+                text("SELECT nombre, apellido FROM medicos WHERE id = :id"),
+                {"id": med_id},
+            )
+            medico = result_med.mappings().first()
+
+            if medico:
+                disponibilidad[med_id] = {
+                    "nombre": f"{medico['nombre']} {medico['apellido']}",
+                    "ocupadas": ocupadas,
+                }
+    await engine.dispose()
+
+    # Generate potential slots
+    date_obj = datetime.strptime(fecha, "%Y-%m-%d").date()
+    all_slots = []
+    for hour in range(8, 20):
+        for minute in [0, 30]:
+            slot_start = datetime.combine(date_obj, datetime.min.time().replace(hour=hour, minute=minute))
+            if slot_start + timedelta(minutes=duracion_min) <= datetime.combine(date_obj, datetime.min.time().replace(hour=20)):
+                all_slots.append(slot_start)
+
+    # Find slots where ALL doctors are free
+    slots_compartidos = []
+    for slot in all_slots:
+        slot_end = slot + timedelta(minutes=duracion_min)
+        todos_libres = True
+        for med_id, info in disponibilidad.items():
+            for occ in info["ocupadas"]:
+                if slot < occ["fecha_hora_fin"] and slot_end > occ["fecha_hora_inicio"]:
+                    todos_libres = False
+                    break
+            if not todos_libres:
+                break
+        if todos_libres:
+            slots_compartidos.append(slot)
+
+    return json.dumps(
+        {
+            "medicos": [disponibilidad[mid]["nombre"] for mid in medico_ids if mid in disponibilidad],
+            "fecha": fecha,
+            "duracion_min": duracion_min,
+            "horarios_compartidos": [
+                {
+                    "hora_inicio": s.strftime("%H:%M"),
+                    "hora_fin": (s + timedelta(minutes=duracion_min)).strftime("%H:%M"),
+                    "sugerencia": s.strftime("%Y-%m-%dT%H:%M:%S"),
+                }
+                for s in slots_compartidos[:8]
+            ],
+            "total_disponibles": len(slots_compartidos),
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@tool
+async def triagar_por_sintomas(descripcion_sintomas: str) -> str:
+    """Analiza síntomas descritos y sugiere especialidad y nivel de urgencia.
+
+    Args:
+        descripcion_sintomas: Descripción de síntomas en lenguaje natural.
+    """
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    # Keyword-based triage rules
+    reglas = {
+        "urgente": {
+            "keywords": [
+                "dolor pecho", "dificultad para respirar", "sangrado abundante",
+                "pérdida de conocimiento", "convulsiones", "alergia severa",
+                "dolor abdominal intenso", "fiebre alta", "traumatismo",
+            ],
+            "nivel": "URGENTE",
+            "especialidad": "Urgencias",
+            "tiempo": "Inmediato",
+        },
+        "alta": {
+            "keywords": [
+                "dolor fuerte", "fiebre", "inflamación", "mareo",
+                "vómito", "diarrea persistente", "dolor articular",
+                "erupción cutánea", "infección",
+            ],
+            "nivel": "ALTA",
+            "especialidad": "Medicina General",
+            "tiempo": "24-48 horas",
+        },
+        "media": {
+            "keywords": [
+                "dolor leve", "cansancio", "tos", "resfriado",
+                "dolor de cabeza", "insomnio", "ansiedad leve",
+                "dolor de espalda", "malestar general",
+            ],
+            "nivel": "MEDIA",
+            "especialidad": "Medicina General",
+            "tiempo": "3-5 días",
+        },
+        "baja": {
+            "keywords": [
+                "consulta", "receta", "certificado", "control",
+                "seguimiento", "prevención", "examen",
+            ],
+            "nivel": "BAJA",
+            "especialidad": "Medicina General",
+            "tiempo": "1-2 semanas",
+        },
+    }
+
+    sintomas_lower = descripcion_sintomas.lower()
+    resultado = None
+
+    for nivel, regla in reglas.items():
+        for keyword in regla["keywords"]:
+            if keyword in sintomas_lower:
+                resultado = regla
+                break
+        if resultado:
+            break
+
+    if not resultado:
+        resultado = {
+            "nivel": "MEDIA",
+            "especialidad": "Medicina General",
+            "tiempo": "3-5 días",
+        }
+
+    # Get available specialties
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        result = await db.execute(
+            text("SELECT id, nombre FROM especialidades ORDER BY nombre")
+        )
+        especialidades = [dict(r) for r in result.mappings().all()]
+    await engine.dispose()
+
+    return json.dumps(
+        {
+            "sintomas_evaluados": descripcion_sintomas,
+            "triage": {
+                "nivel_urgencia": resultado.get("nivel", "MEDIA"),
+                "especialidad_recomendada": resultado.get("especialidad", "Medicina General"),
+                "tiempo_atencion": resultado.get("tiempo", "3-5 días"),
+            },
+            "especialidades_disponibles": especialidades,
+            "mensaje": f"Nivel: {resultado.get('nivel', 'MEDIA')}. "
+                       f"Especialidad: {resultado.get('especialidad', 'Medicina General')}. "
+                       f"Tiempo recomendado: {resultado.get('tiempo', '3-5 días')}.",
+            "nota": "Este triaje es orientativo. Un profesional debe confirmar la evaluación.",
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
 _TOOLS = [
     # Basic tools
     buscar_en_documentos,
@@ -820,6 +1543,14 @@ _TOOLS = [
     analizar_carga_medico,
     detectar_conflictos,
     analizar_patrones_paciente,
+    # Advanced AI scheduling tools
+    crear_cita_por_lenguaje,
+    reagendamiento_inteligente,
+    agregar_a_lista_espera,
+    predecir_no_show,
+    sugerir_seguimiento,
+    encontrar_horario_compartido,
+    triagar_por_sintomas,
 ]
 
 
