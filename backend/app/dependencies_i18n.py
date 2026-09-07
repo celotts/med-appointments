@@ -1,16 +1,13 @@
 """Dependencies for internationalization (i18n)."""
 
-from typing import Optional
-
+from core.i18n import get_supported_languages, get_translation
 from fastapi import Header, HTTPException
 
-from core.i18n import get_translation, get_supported_languages
 
-
-def get_language(accept_language: Optional[str] = Header(None)) -> str:
+def get_language(accept_language: str | None = Header(None)) -> str:
     """
     Extract language from Accept-Language header.
-    
+
     Examples:
         Accept-Language: en
         Accept-Language: es
@@ -19,11 +16,11 @@ def get_language(accept_language: Optional[str] = Header(None)) -> str:
     """
     if not accept_language:
         return "en"
-    
+
     # Parse Accept-Language header
     # Example: "en-US,en;q=0.9,es;q=0.8"
     supported = get_supported_languages()
-    
+
     # Split by comma and extract language codes
     for part in accept_language.split(","):
         lang_code = part.split(";")[0].strip().lower()
@@ -31,7 +28,7 @@ def get_language(accept_language: Optional[str] = Header(None)) -> str:
         base_lang = lang_code.split("-")[0]
         if base_lang in supported:
             return base_lang
-    
+
     # Default to English
     return "en"
 
@@ -43,14 +40,14 @@ def t(key: str, lang: str = "en", **kwargs) -> str:
 
 class I18nResponse:
     """Helper class for creating i18n responses."""
-    
+
     def __init__(self, language: str = "en"):
         self.language = language
-    
+
     def get(self, key: str, **kwargs) -> str:
         """Get translation for key with optional format kwargs."""
         return get_translation(key, self.language, **kwargs)
-    
+
     def success(self, key: str, **kwargs) -> dict:
         """Create success response with translation."""
         message = self.get(key, **kwargs)
@@ -59,7 +56,7 @@ class I18nResponse:
             "message": message,
             "language": self.language,
         }
-    
+
     def error(self, key: str, status_code: int = 400, **kwargs) -> HTTPException:
         """Create error response with translation."""
         message = self.get(key, **kwargs)
@@ -69,5 +66,5 @@ class I18nResponse:
                 "status": "error",
                 "message": message,
                 "language": self.language,
-            }
+            },
         )

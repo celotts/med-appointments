@@ -4,8 +4,8 @@ from models.appointment import Appointment as AppointmentModel
 from models.appointment_status import AppointmentStatus as AppointmentStatusModel
 from schemas.appointment import (
     VALID_TRANSITIONS,
-    AppointmentStatusUpdate,
     AppointmentStatusCode,
+    AppointmentStatusUpdate,
 )
 from schemas.appointment import (
     AppointmentCreate as AppointmentCreateSchema,
@@ -41,16 +41,22 @@ async def get_status_by_code(
     return result.scalars().first()
 
 
-async def get_status_by_id(db: AsyncSession, status_id: int) -> AppointmentStatusModel | None:
+async def get_status_by_id(
+    db: AsyncSession, status_id: int
+) -> AppointmentStatusModel | None:
     return await db.get(AppointmentStatusModel, status_id)
 
 
 async def get_statuses(db: AsyncSession) -> list[AppointmentStatusModel]:
-    result = await db.execute(select(AppointmentStatusModel).order_by(AppointmentStatusModel.id))
+    result = await db.execute(
+        select(AppointmentStatusModel).order_by(AppointmentStatusModel.id)
+    )
     return result.scalars().all()
 
 
-async def get_appointment(db: AsyncSession, appointment_id: int) -> AppointmentModel | None:
+async def get_appointment(
+    db: AsyncSession, appointment_id: int
+) -> AppointmentModel | None:
     result = await db.execute(
         select(AppointmentModel)
         .options(selectinload(AppointmentModel.status))
@@ -78,7 +84,9 @@ async def get_appointments(
     if doctor_id is not None:
         stmt = stmt.where(AppointmentModel.doctor_id == doctor_id)
     if status is not None:
-        sub = select(AppointmentStatusModel.id).where(AppointmentStatusModel.code == status)
+        sub = select(AppointmentStatusModel.id).where(
+            AppointmentStatusModel.code == status
+        )
         stmt = stmt.where(AppointmentModel.status_id.in_(sub))
     stmt = stmt.offset(skip).limit(limit)
     result = await db.execute(stmt)
@@ -109,7 +117,9 @@ async def _has_conflict(
     return result.scalars().first() is not None
 
 
-async def create_appointment(db: AsyncSession, appointment: AppointmentCreateSchema) -> AppointmentModel:
+async def create_appointment(
+    db: AsyncSession, appointment: AppointmentCreateSchema
+) -> AppointmentModel:
     if appointment.end_datetime <= appointment.start_datetime:
         raise ValueError("end_datetime must be after start_datetime")
     if await _has_conflict(
@@ -122,9 +132,7 @@ async def create_appointment(db: AsyncSession, appointment: AppointmentCreateSch
 
     db_status = await get_status_by_code(db, AppointmentStatusCode.PENDING)
     if db_status is None:
-        raise ValueError(
-            "PENDING status does not exist. Run the status seed."
-        )
+        raise ValueError("PENDING status does not exist. Run the status seed.")
 
     db_appointment = AppointmentModel(
         patient_id=appointment.patient_id,
@@ -202,7 +210,9 @@ async def change_status(
 
 
 async def update_appointment(
-    db: AsyncSession, db_appointment: AppointmentModel, appointment: AppointmentUpdateSchema
+    db: AsyncSession,
+    db_appointment: AppointmentModel,
+    appointment: AppointmentUpdateSchema,
 ) -> AppointmentModel:
     if appointment.start_datetime is not None or appointment.end_datetime is not None:
         new_start = appointment.start_datetime or db_appointment.start_datetime
@@ -226,7 +236,9 @@ async def update_appointment(
     return await get_appointment(db, db_appointment.id)
 
 
-async def delete_appointment(db: AsyncSession, db_appointment: AppointmentModel) -> AppointmentModel:
+async def delete_appointment(
+    db: AsyncSession, db_appointment: AppointmentModel
+) -> AppointmentModel:
     await db.delete(db_appointment)
     await db.commit()
     return db_appointment

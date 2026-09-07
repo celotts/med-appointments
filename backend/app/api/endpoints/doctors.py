@@ -2,8 +2,8 @@ from typing import Any
 
 from core import crud_doctor, crud_specialty
 from dependencies import get_current_user, get_db
-from dependencies_i18n import get_language, I18nResponse
-from fastapi import APIRouter, Depends, HTTPException
+from dependencies_i18n import I18nResponse, get_language
+from fastapi import APIRouter, Depends
 from models.user import User as UserModel
 from schemas.doctor import Doctor, DoctorCreate, DoctorUpdate
 from sqlalchemy.exc import IntegrityError
@@ -12,7 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 router = APIRouter()
 
 
-async def _ensure_specialty(db: AsyncSession, specialty_id: int, i18n: I18nResponse) -> None:
+async def _ensure_specialty(
+    db: AsyncSession, specialty_id: int, i18n: I18nResponse
+) -> None:
     if not await crud_specialty.get_specialty(db, specialty_id):
         raise i18n.error("specialty_not_found", status_code=404)
 

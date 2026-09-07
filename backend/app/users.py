@@ -55,12 +55,8 @@ async def create_user(
     "/{user_id}",
     response_model=User,
     summary="Get a user by ID",
-    responses={
-        404: {"description": "The user with the specified ID was not found."}
-    },
+    responses={404: {"description": "The user with the specified ID was not found."}},
 )
-
-
 async def read_user_by_id(
     user_id: uuid.UUID,
     db: AsyncSession = Depends(dependencies.get_db),
@@ -77,9 +73,7 @@ async def read_user_by_id(
     "/{user_id}",
     response_model=User,
     summary="Update an existing user",
-    responses={
-        404: {"description": "The user with the specified ID was not found."}
-    },
+    responses={404: {"description": "The user with the specified ID was not found."}},
 )
 async def update_user(
     *,
@@ -100,9 +94,7 @@ async def update_user(
     "/{user_id}",
     response_model=User,
     summary="Delete a user",
-    responses={
-        404: {"description": "The user with the specified ID was not found."}
-    },
+    responses={404: {"description": "The user with the specified ID was not found."}},
 )
 async def delete_user(
     *,

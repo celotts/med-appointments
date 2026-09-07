@@ -7,8 +7,8 @@ from core.agent import chat_con_agente, chat_con_agente_stream
 from core.config import settings
 from core.rag import ingest_document, search_documents
 from dependencies import get_current_user, get_db
-from dependencies_i18n import get_language, I18nResponse
-from fastapi import APIRouter, Depends, HTTPException
+from dependencies_i18n import I18nResponse, get_language
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from models.user import User as UserModel
 from schemas.rag import (
@@ -83,7 +83,7 @@ async def ingest(
             content=doc_in.content,
         )
         return result
-    except Exception as exc:
+    except Exception:
         raise i18n.error("internal_error", status_code=500)
 
 
@@ -148,7 +148,7 @@ async def search(
             db, search_in.query, k=search_in.k, reference_type=search_in.reference_type
         )
         return results
-    except Exception as exc:
+    except Exception:
         raise i18n.error("search_error", status_code=500)
 
 
@@ -177,7 +177,7 @@ async def chat(
             historial=history,
         )
         return ChatResponse(response=response)
-    except Exception as exc:
+    except Exception:
         raise i18n.error("agent_error", status_code=500)
 
 
@@ -207,7 +207,7 @@ async def chat_stream(
             ):
                 yield f"data: {json.dumps({'token': chunk})}\n\n"
             yield f"data: {json.dumps({'done': True})}\n\n"
-        except Exception as exc:
+        except Exception:
             yield f"data: {json.dumps({'error': i18n.get('agent_error')})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

@@ -3,8 +3,8 @@
 from typing import Any
 
 from dependencies import get_current_user, get_db
-from dependencies_i18n import get_language, I18nResponse
-from fastapi import APIRouter, Depends, HTTPException
+from dependencies_i18n import I18nResponse, get_language
+from fastapi import APIRouter, Depends
 from models.user import User as UserModel
 from pydantic import BaseModel, EmailStr
 from services.notifications import notification_service
@@ -142,12 +142,14 @@ async def send_bulk_reminders(
             apt["doctor"],
             str(apt["start_datetime"]),
         )
-        sent.append({
-            "appointment_id": apt["id"],
-            "patient": apt["patient"],
-            "email": apt["email"],
-            "subject": subject,
-        })
+        sent.append(
+            {
+                "appointment_id": apt["id"],
+                "patient": apt["patient"],
+                "email": apt["email"],
+                "subject": subject,
+            }
+        )
 
     return {
         "total_reminders": len(sent),

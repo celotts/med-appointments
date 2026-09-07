@@ -1,9 +1,9 @@
 from api.endpoints import (
-    appointments,
     appointment_statuses,
+    appointments,
+    doctors,
     integrations,
     login,
-    doctors,
     notifications,
     patients,
     premium,
@@ -44,7 +44,9 @@ app.include_router(
 app.include_router(doctors.router, prefix="/api/v1/doctors", tags=["Doctors"])
 app.include_router(patients.router, prefix="/api/v1/patients", tags=["Patients"])
 app.include_router(
-    appointment_statuses.router, prefix="/api/v1/appointment-statuses", tags=["Appointment Statuses"]
+    appointment_statuses.router,
+    prefix="/api/v1/appointment-statuses",
+    tags=["Appointment Statuses"],
 )
 app.include_router(appointments.router)
 app.include_router(rag.router)

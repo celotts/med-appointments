@@ -2,8 +2,8 @@ from typing import Any
 
 from core import crud_specialty
 from dependencies import get_current_user, get_db
-from dependencies_i18n import get_language, I18nResponse
-from fastapi import APIRouter, Depends, HTTPException
+from dependencies_i18n import I18nResponse, get_language
+from fastapi import APIRouter, Depends
 from models.user import User as UserModel
 from schemas.specialty import Specialty, SpecialtyCreate, SpecialtyUpdate
 from sqlalchemy.exc import IntegrityError

@@ -3,8 +3,8 @@
 from typing import Any
 
 from dependencies import get_current_user, get_db
-from dependencies_i18n import get_language, I18nResponse
-from fastapi import APIRouter, Depends, HTTPException, Query
+from dependencies_i18n import I18nResponse, get_language
+from fastapi import APIRouter, Depends, Query
 from models.user import User as UserModel
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -63,22 +63,27 @@ async def get_calendar_events(
 
     events = []
     for apt in appointments:
-        events.append({
-            "id": f"apt_{apt['id']}",
-            "summary": f"Appointment: {apt['patient']}",
-            "description": apt["reason"] or "Medical appointment",
-            "start": {
-                "dateTime": str(apt["start_datetime"]),
-                "timeZone": "America/Mexico_City",
-            },
-            "end": {
-                "dateTime": str(apt["end_datetime"]),
-                "timeZone": "America/Mexico_City",
-            },
-            "attendees": [
-                {"email": apt["patient"].lower().replace(" ", ".") + "@placeholder.com"}
-            ],
-        })
+        events.append(
+            {
+                "id": f"apt_{apt['id']}",
+                "summary": f"Appointment: {apt['patient']}",
+                "description": apt["reason"] or "Medical appointment",
+                "start": {
+                    "dateTime": str(apt["start_datetime"]),
+                    "timeZone": "America/Mexico_City",
+                },
+                "end": {
+                    "dateTime": str(apt["end_datetime"]),
+                    "timeZone": "America/Mexico_City",
+                },
+                "attendees": [
+                    {
+                        "email": apt["patient"].lower().replace(" ", ".")
+                        + "@placeholder.com"
+                    }
+                ],
+            }
+        )
 
     return {
         "doctor_id": doctor_id,
@@ -132,15 +137,17 @@ async def export_ical(
     for apt in appointments:
         start = apt["start_datetime"].strftime("%Y%m%dT%H%M%S")
         end = apt["end_datetime"].strftime("%Y%m%dT%H%M%S")
-        ical_lines.extend([
-            "BEGIN:VEVENT",
-            f"UID:apt_{apt['id']}@medappointments.com",
-            f"DTSTART:{start}",
-            f"DTEND:{end}",
-            f"SUMMARY:Appointment - {apt['patient']}",
-            f"DESCRIPTION:{apt['reason'] or 'Medical appointment'}",
-            "END:VEVENT",
-        ])
+        ical_lines.extend(
+            [
+                "BEGIN:VEVENT",
+                f"UID:apt_{apt['id']}@medappointments.com",
+                f"DTSTART:{start}",
+                f"DTEND:{end}",
+                f"SUMMARY:Appointment - {apt['patient']}",
+                f"DESCRIPTION:{apt['reason'] or 'Medical appointment'}",
+                "END:VEVENT",
+            ]
+        )
 
     ical_lines.append("END:VCALENDAR")
 
@@ -167,9 +174,7 @@ async def list_branches(
     language: str = Depends(get_language),
 ) -> Any:
     """Lists all clinic branches."""
-    result = await db.execute(
-        text("SELECT * FROM branches WHERE deleted_at IS NULL")
-    )
+    result = await db.execute(text("SELECT * FROM branches WHERE deleted_at IS NULL"))
     branches = result.mappings().all()
     return {"total": len(branches), "branches": [dict(b) for b in branches]}
 
@@ -200,7 +205,11 @@ async def get_doctors_by_branch(
         {"branch_id": branch_id},
     )
     doctors = result.mappings().all()
-    return {"branch_id": branch_id, "total": len(doctors), "doctors": [dict(d) for d in doctors]}
+    return {
+        "branch_id": branch_id,
+        "total": len(doctors),
+        "doctors": [dict(d) for d in doctors],
+    }
 
 
 # ============================================================================
@@ -219,14 +228,26 @@ async def list_roles(
     language: str = Depends(get_language),
 ) -> Any:
     """Lists all system roles."""
-    result = await db.execute(text("SELECT id, name FROM roles WHERE deleted_at IS NULL"))
+    result = await db.execute(
+        text("SELECT id, name FROM roles WHERE deleted_at IS NULL")
+    )
     roles = result.mappings().all()
 
     return {
         "roles": [dict(r) for r in roles],
         "example_permissions": {
-            "ADMIN": ["create_appointment", "edit_appointment", "cancel_appointment", "view_reports", "manage_users"],
-            "RECEPTIONIST": ["create_appointment", "edit_appointment", "view_appointments"],
+            "ADMIN": [
+                "create_appointment",
+                "edit_appointment",
+                "cancel_appointment",
+                "view_reports",
+                "manage_users",
+            ],
+            "RECEPTIONIST": [
+                "create_appointment",
+                "edit_appointment",
+                "view_appointments",
+            ],
             "DOCTOR": ["view_appointments", "edit_status", "view_notes"],
             "PATIENT": ["view_my_appointments", "cancel_my_appointment"],
         },
@@ -265,22 +286,40 @@ async def get_user_permissions(
     # Permission mapping
     permissions_map = {
         "SUPER_ADMIN": [
-            "create_appointment", "edit_appointment", "cancel_appointment", "reschedule_appointment",
-            "view_reports", "manage_users", "manage_doctors",
-            "view_all_appointments", "configure_system",
+            "create_appointment",
+            "edit_appointment",
+            "cancel_appointment",
+            "reschedule_appointment",
+            "view_reports",
+            "manage_users",
+            "manage_doctors",
+            "view_all_appointments",
+            "configure_system",
         ],
         "ADMIN": [
-            "create_appointment", "edit_appointment", "cancel_appointment", "reschedule_appointment",
-            "view_reports", "manage_users", "view_all_appointments",
+            "create_appointment",
+            "edit_appointment",
+            "cancel_appointment",
+            "reschedule_appointment",
+            "view_reports",
+            "manage_users",
+            "view_all_appointments",
         ],
         "RECEPCIONISTA": [
-            "create_appointment", "edit_appointment", "cancel_appointment", "view_appointments",
+            "create_appointment",
+            "edit_appointment",
+            "cancel_appointment",
+            "view_appointments",
         ],
         "DOCTOR": [
-            "view_appointments", "edit_status", "view_notes", "edit_notes",
+            "view_appointments",
+            "edit_status",
+            "view_notes",
+            "edit_notes",
         ],
         "PATIENT": [
-            "view_my_appointments", "cancel_my_appointment",
+            "view_my_appointments",
+            "cancel_my_appointment",
         ],
     }
 

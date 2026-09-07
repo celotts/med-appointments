@@ -1,12 +1,12 @@
 from core import crud_appointment, crud_doctor, crud_medical_note, crud_patient
 from dependencies import get_current_user, get_db
-from dependencies_i18n import get_language, I18nResponse
+from dependencies_i18n import I18nResponse, get_language
 from fastapi import APIRouter, Depends, HTTPException
 from models.user import User as UserModel
 from schemas.appointment import (
     AppointmentCreate,
-    AppointmentStatusUpdate,
     AppointmentOut,
+    AppointmentStatusUpdate,
     AppointmentUpdate,
     MedicalNoteCreate,
     MedicalNoteOut,
@@ -63,7 +63,7 @@ async def create_appointment(
 ) -> AppointmentOut:
     """Schedules a new appointment in PENDING status."""
     i18n = I18nResponse(language)
-    
+
     if not await crud_patient.get_patient(db, appointment_in.patient_id):
         raise i18n.error("patient_not_found", status_code=404)
     if not await crud_doctor.get_doctor(db, appointment_in.doctor_id):
@@ -120,7 +120,9 @@ async def update_appointment(
     if not db_appointment:
         raise i18n.error("appointment_not_found", status_code=404)
     try:
-        return await crud_appointment.reschedule_appointment(db, db_appointment, appointment_in)
+        return await crud_appointment.reschedule_appointment(
+            db, db_appointment, appointment_in
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -188,7 +190,9 @@ async def list_notes(
     current_user: UserModel = Depends(get_current_user),
 ) -> list[MedicalNoteOut]:
     """List of medical notes, optionally filtered by appointment."""
-    return await crud_medical_note.get_notes(db, skip=skip, limit=limit, appointment_id=appointment_id)
+    return await crud_medical_note.get_notes(
+        db, skip=skip, limit=limit, appointment_id=appointment_id
+    )
 
 
 @router.post(

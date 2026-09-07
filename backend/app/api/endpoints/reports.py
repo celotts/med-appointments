@@ -3,7 +3,7 @@
 from typing import Any
 
 from dependencies import get_current_user, get_db
-from dependencies_i18n import get_language, I18nResponse
+from dependencies_i18n import I18nResponse, get_language
 from fastapi import APIRouter, Depends, Query
 from models.user import User as UserModel
 from pydantic import BaseModel
@@ -185,8 +185,8 @@ async def get_no_show_rate(
         "total_appointments": total,
         "completed": completed,
         "cancelled": cancelled,
-        "attendance_rate": f"{(completed/total*100):.1f}%" if total > 0 else "0%",
-        "cancellation_rate": f"{(cancelled/total*100):.1f}%" if total > 0 else "0%",
+        "attendance_rate": f"{(completed / total * 100):.1f}%" if total > 0 else "0%",
+        "cancellation_rate": f"{(cancelled / total * 100):.1f}%" if total > 0 else "0%",
     }
 
 
@@ -202,9 +202,10 @@ async def export_appointments_csv(
     language: str = Depends(get_language),
 ) -> Any:
     """Exports appointments data as CSV format."""
-    from fastapi.responses import StreamingResponse
-    import io
     import csv
+    import io
+
+    from fastapi.responses import StreamingResponse
 
     result = await db.execute(
         text(
@@ -230,22 +231,23 @@ async def export_appointments_csv(
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow([
-        "ID", "Start", "End", "Patient",
-        "Doctor", "Specialty", "Status", "Reason"
-    ])
+    writer.writerow(
+        ["ID", "Start", "End", "Patient", "Doctor", "Specialty", "Status", "Reason"]
+    )
 
     for row in rows:
-        writer.writerow([
-            row["id"],
-            str(row["start_datetime"]),
-            str(row["end_datetime"]),
-            row["patient"],
-            row["doctor"],
-            row["specialty"],
-            row["status"],
-            row["reason"],
-        ])
+        writer.writerow(
+            [
+                row["id"],
+                str(row["start_datetime"]),
+                str(row["end_datetime"]),
+                row["patient"],
+                row["doctor"],
+                row["specialty"],
+                row["status"],
+                row["reason"],
+            ]
+        )
 
     output.seek(0)
     return StreamingResponse(

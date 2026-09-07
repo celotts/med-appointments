@@ -3,8 +3,8 @@
 from typing import Any
 
 from dependencies import get_current_user, get_db
-from dependencies_i18n import get_language, I18nResponse
-from fastapi import APIRouter, Depends, HTTPException, Query
+from dependencies_i18n import I18nResponse, get_language
+from fastapi import APIRouter, Depends, Query
 from models.user import User as UserModel
 from pydantic import BaseModel
 from sqlalchemy import text
