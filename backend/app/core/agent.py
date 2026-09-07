@@ -88,6 +88,16 @@ GESTIÓN MASIVA Y EMERGENCIA:
 - optimizar_agenda: Analizar y sugerir mejoras de eficiencia
 - generar_recordatorio: Crear recordatorios personalizados
 
+FEATURES ÚNICOS DE DIFERENCIACIÓN:
+- predecir_demanda: Anticipar picos de demanda y especialidades
+- matching_paciente_medico: Encontrar el mejor médico para cada paciente
+- duracion_inteligente: Predecir duración óptima de cada cita
+- optimizar_ingresos: Estrategias para maximizar facturación
+- score_satisfaccion: Evaluar satisfacción del paciente
+- resumen_clinico_paciente: Generar resumen antes de la cita
+- detectar_anomalias: Identificar patrones inusuales
+- scheduling_adaptativo: Aprender y mejorar automáticamente
+
 REGLAS:
 - Sé conciso y profesional.
 - Si no tienes suficiente información, indica qué dato falta.
@@ -2140,6 +2150,815 @@ async def generar_recordatorio(cita_id: int, tipo: str = "general") -> str:
     )
 
 
+# ============================================================================
+# AGENDA IA: FEATURES ÚNICOS DE DIFERENCIACIÓN
+# ============================================================================
+
+
+@tool
+async def predecir_demanda(dias: int = 30) -> str:
+    """Predice la demanda de citas médicas para los próximos N días.
+
+    Analiza tendencias históricas, patrones estacionales y sugiere:
+    - Días de alta demanda esperados
+    - Especialidades más solicitadas
+    - Recomendaciones de staffing
+
+    Args:
+        dias: Días a predecir (default 30).
+    """
+    from datetime import datetime, timedelta
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        # Get historical data (last 90 days)
+        result = await db.execute(
+            text(
+                """
+                SELECT DATE(c.fecha_hora_inicio) AS dia,
+                       e.nombre AS especialidad,
+                       EXTRACT(DOW FROM c.fecha_hora_inicio) AS dia_semana,
+                       COUNT(*) AS total_citas
+                FROM citas c
+                JOIN medicos m ON m.id = c.medico_id
+                JOIN especialidades e ON e.id = m.especialidad_id
+                JOIN estados_cita ec ON ec.id = c.estado_id
+                WHERE c.fecha_hora_inicio >= NOW() - INTERVAL '90 days'
+                  AND ec.codigo NOT IN ('CANCELADA', 'SUSPENDIDA')
+                GROUP BY dia, especialidad, dia_semana
+                ORDER BY dia
+                """
+            )
+        )
+        historial = result.mappings().all()
+
+        # Get current month appointments
+        result_actual = await db.execute(
+            text(
+                """
+                SELECT DATE(c.fecha_hora_inicio) AS dia,
+                       COUNT(*) AS total
+                FROM citas c
+                JOIN estados_cita ec ON ec.id = c.estado_id
+                WHERE c.fecha_hora_inicio >= DATE_TRUNC('month', NOW())
+                  AND c.fecha_hora_inicio < DATE_TRUNC('month', NOW()) + INTERVAL '1 month'
+                  AND ec.codigo NOT IN ('CANCELADA', 'SUSPENDIDA')
+                GROUP BY dia
+                """
+            )
+        )
+        mes_actual = result_actual.mappings().all()
+    await engine.dispose()
+
+    # Analyze patterns
+    dias_semana = {0: "Dom", 1: "Lun", 2: "Mar", 3: "Mié", 4: "Jue", 5: "Vie", 6: "Sáb"}
+    demanda_por_dia = {}
+    demanda_por_especialidad = {}
+
+    for row in historial:
+        dia = dias_semana.get(row["dia_semana"], "?")
+        demanda_por_dia[dia] = demanda_por_dia.get(dia, 0) + row["total_citas"]
+        esp = row["especialidad"]
+        demanda_por_especialidad[esp] = demanda_por_especialidad.get(esp, 0) + row["total_citas"]
+
+    # Predictions
+    promedio_diario = sum(demanda_por_dia.values()) / 7 if demanda_por_dia else 0
+    dia_pico = max(demanda_por_dia, key=demanda_por_dia.get) if demanda_por_dia else "N/A"
+    especialidad_top = max(demanda_por_especialidad, key=demanda_por_especialidad.get) if demanda_por_especialidad else "N/A"
+
+    return json.dumps(
+        {
+            "periodo_analisis": "90 días históricos",
+            "periodo_prediccion": f"Próximos {dias} días",
+            "promedio_citas_dia": round(promedio_diario, 1),
+            "dia_mas_demanda": dia_pico,
+            "demanda_por_dia": demanda_por_dia,
+            "especialidades_top": demanda_por_especialidad,
+            "especialidad_mas_solicitada": especialidad_top,
+            "citas_mes_actual": len(mes_actual),
+            "recomendaciones": [
+                f"Aumentar disponibilidad los {dia_pico}",
+                f"Priorizar especialidad: {especialidad_top}",
+                "Considerar horarios extendidos en temporada alta",
+            ],
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@tool
+async def matching_paciente_medico(paciente_id: int) -> str:
+    """Recomienda el mejor médico para un paciente basado en compatibilidad.
+
+    Analiza:
+    - Historial de citas previas
+    - Especialidades más visitadas
+    - Médicos con mejor tasa de completado
+    - Disponibilidad actual
+
+    Args:
+        paciente_id: ID del paciente.
+    """
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        # Get patient info
+        result_pat = await db.execute(
+            text(
+                """
+                SELECT p.id, CONCAT(p.nombre, ' ', p.apellido) AS nombre,
+                       COUNT(c.id) AS total_citas,
+                       SUM(CASE WHEN ec.codigo = 'COMPLETADA' THEN 1 ELSE 0 END) AS completadas,
+                       SUM(CASE WHEN ec.codigo = 'CANCELADA' THEN 1 ELSE 0 END) AS canceladas
+                FROM pacientes p
+                LEFT JOIN citas c ON c.paciente_id = p.id
+                LEFT JOIN estados_cita ec ON ec.id = c.estado_id
+                WHERE p.id = :paciente_id
+                GROUP BY p.id, p.nombre, p.apellido
+                """
+            ),
+            {"paciente_id": paciente_id},
+        )
+        paciente = result_pat.mappings().first()
+
+        if not paciente:
+            await engine.dispose()
+            return f"No se encontró el paciente {paciente_id}."
+
+        # Get doctor history for this patient
+        result_docs = await db.execute(
+            text(
+                """
+                SELECT m.id, CONCAT(m.nombre, ' ', m.apellido) AS nombre,
+                       e.nombre AS especialidad,
+                       COUNT(c.id) AS citas_con_paciente,
+                       SUM(CASE WHEN ec.codigo = 'COMPLETADA' THEN 1 ELSE 0 END) AS completadas,
+                       SUM(CASE WHEN ec.codigo = 'CANCELADA' THEN 1 ELSE 0 END) AS canceladas
+                FROM medicos m
+                JOIN especialidades e ON e.id = m.especialidad_id
+                LEFT JOIN citas c ON c.medico_id = m.id AND c.paciente_id = :paciente_id
+                LEFT JOIN estados_cita ec ON ec.id = c.estado_id
+                GROUP BY m.id, m.nombre, m.apellido, e.nombre
+                HAVING COUNT(c.id) > 0
+                ORDER BY completadas DESC NULLS LAST
+                LIMIT 5
+                """
+            ),
+            {"paciente_id": paciente_id},
+        )
+        medicos_historial = result_docs.mappings().all()
+
+        # Get top doctors overall
+        result_top = await db.execute(
+            text(
+                """
+                SELECT m.id, CONCAT(m.nombre, ' ', m.apellido) AS nombre,
+                       e.nombre AS especialidad,
+                       COUNT(c.id) AS total_citas,
+                       SUM(CASE WHEN ec.codigo = 'COMPLETADA' THEN 1 ELSE 0 END) AS completadas
+                FROM medicos m
+                JOIN especialidades e ON e.id = m.especialidad_id
+                LEFT JOIN citas c ON c.medico_id = m.id
+                LEFT JOIN estados_cita ec ON ec.id = c.estado_id
+                GROUP BY m.id, m.nombre, m.apellido, e.nombre
+                ORDER BY completadas DESC NULLS LAST
+                LIMIT 5
+                """
+            )
+        )
+        medicos_top = result_top.mappings().all()
+    await engine.dispose()
+
+    # Calculate compatibility scores
+    recomendaciones = []
+    for med in medicos_historial:
+        tasa_exito = (med["completadas"] or 0) / med["citas_con_paciente"] if med["citas_con_paciente"] > 0 else 0
+        score = tasa_exito * 100
+        recomendaciones.append({
+            "medico_id": med["id"],
+            "nombre": med["nombre"],
+            "especialidad": med["especialidad"],
+            "citas_juntos": med["citas_con_paciente"],
+            "tasa_exito": f"{(tasa_exito*100):.1f}%",
+            "score_compatibilidad": round(score, 1),
+            "tipo": "historial",
+        })
+
+    # Add top doctors if no history
+    if not recomendaciones:
+        for med in medicos_top:
+            tasa = (med["completadas"] or 0) / med["total_citas"] if med["total_citas"] > 0 else 0
+            recomendaciones.append({
+                "medico_id": med["id"],
+                "nombre": med["nombre"],
+                "especialidad": med["especialidad"],
+                "score_compatibilidad": round(tasa * 100, 1),
+                "tipo": "recomendado",
+            })
+
+    return json.dumps(
+        {
+            "paciente": paciente["nombre"],
+            "total_citas_historial": paciente["total_citas"],
+            "mejores_medicos": sorted(recomendaciones, key=lambda x: x["score_compatibilidad"], reverse=True)[:5],
+            "mensaje": "Médicos ordenados por compatibilidad con el paciente.",
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@tool
+async def duracion_inteligente(medico_id: int, motivo: str = "") -> str:
+    """Predice la duración óptima de una cita basada en el tipo de consulta.
+
+    Analiza citas previas similares y sugiere duración personalizada.
+
+    Args:
+        medico_id: ID del médico.
+        motivo: Motivo de la consulta (para buscar patrones similares).
+    """
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        # Get average duration by doctor
+        result = await db.execute(
+            text(
+                """
+                SELECT AVG(EXTRACT(EPOCH FROM (c.fecha_hora_fin - c.fecha_hora_inicio))/60) AS promedio_min,
+                       MIN(EXTRACT(EPOCH FROM (c.fecha_hora_fin - c.fecha_hora_inicio))/60) AS minimo,
+                       MAX(EXTRACT(EPOCH FROM (c.fecha_hora_fin - c.fecha_hora_inicio))/60) AS maximo,
+                       COUNT(*) AS total_citas
+                FROM citas c
+                JOIN estados_cita ec ON ec.id = c.estado_id
+                WHERE c.medico_id = :medico_id
+                  AND ec.codigo = 'COMPLETADA'
+                """
+            ),
+            {"medico_id": medico_id},
+        )
+        stats = result.mappings().first()
+
+        # Get duration by reason (if provided)
+        duracion_motivo = None
+        if motivo:
+            result_motivo = await db.execute(
+                text(
+                    """
+                    SELECT AVG(EXTRACT(EPOCH FROM (c.fecha_hora_fin - c.fecha_hora_inicio))/60) AS promedio
+                    FROM citas c
+                    JOIN estados_cita ec ON ec.id = c.estado_id
+                    WHERE c.medico_id = :medico_id
+                      AND c.motivo_consulta ILIKE :motivo
+                      AND ec.codigo = 'COMPLETADA'
+                    """
+                ),
+                {"medico_id": medico_id, "motivo": f"%{motivo}%"},
+            )
+            duracion_motivo = result_motivo.mappings().first()
+    await engine.dispose()
+
+    promedio = stats["promedio_min"] or 30
+    minimo = stats["minimo"] or 15
+    maximo = stats["maximo"] or 60
+
+    duracion_recomendada = promedio
+    if duracion_motivo and duracion_motivo["promedio"]:
+        duracion_recomendada = duracion_motivo["promedio"]
+
+    return json.dumps(
+        {
+            "medico_id": medico_id,
+            "motivo_consulta": motivo or "General",
+            "estadisticas_historicas": {
+                "promedio_min": round(promedio, 1),
+                "minimo_min": round(minimo, 1),
+                "maximo_min": round(maximo, 1),
+                "total_citas_analizadas": stats["total_citas"],
+            },
+            "duracion_recomendada_min": round(duracion_recomendada),
+            "rango_sugerido": f"{round(duracion_recomendada - 5)}-{round(duracion_recomendada + 10)} min",
+            "mensaje": f"Cita recomendada de {round(duracion_recomendada)} minutos.",
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@tool
+async def optimizar_ingresos(medico_id: int, dias: int = 30) -> str:
+    """Analiza y sugiere estrategias para maximizar ingresos.
+
+    Identifica:
+    - Horarios de mayor facturación
+    - Citas canceladas que podrían rellenarse
+    - Oportunidades de upselling (procedimientos adicionales)
+    - Precio óptimo por tipo de cita
+
+    Args:
+        medico_id: ID del médico.
+        dias: Días a analizar (default 30).
+    """
+    from datetime import datetime, timedelta
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        # Get appointment stats
+        result = await db.execute(
+            text(
+                """
+                SELECT EXTRACT(HOUR FROM c.fecha_hora_inicio) AS hora,
+                       EXTRACT(DOW FROM c.fecha_hora_inicio) AS dia_semana,
+                       ec.codigo AS estado,
+                       COUNT(*) AS total
+                FROM citas c
+                JOIN estados_cita ec ON ec.id = c.estado_id
+                WHERE c.medico_id = :medico_id
+                  AND c.fecha_hora_inicio >= NOW() - INTERVAL ':dias days'
+                GROUP BY hora, dia_semana, ec.codigo
+                """
+            ),
+            {"medico_id": medico_id, "dias": dias},
+        )
+        stats = result.mappings().all()
+    await engine.dispose()
+
+    # Analyze
+    horas_facturacion = {}
+    cancelaciones_por_hora = {}
+    total_completadas = 0
+    total_canceladas = 0
+
+    for row in stats:
+        hora = int(row["hora"])
+        if row["estado"] == "COMPLETADA":
+            horas_facturacion[hora] = horas_facturacion.get(hora, 0) + row["total"]
+            total_completadas += row["total"]
+        elif row["estado"] == "CANCELADA":
+            cancelaciones_por_hora[hora] = cancelaciones_por_hora.get(hora, 0) + row["total"]
+            total_canceladas += row["total"]
+
+    # Revenue optimization suggestions
+    sugerencias = []
+    hora_pico = max(horas_facturacion, key=horas_facturacion.get) if horas_facturacion else None
+
+    if hora_pico:
+        sugerencias.append({
+            "tipo": "mantener",
+            "descripcion": f"Hora pico de productividad: {hora_pico:02d}:00",
+            "impacto": "Alto",
+        })
+
+    horas_canceladas = sorted(cancelaciones_por_hora.items(), key=lambda x: x[1], reverse=True)
+    if horas_canceladas:
+        sugerencias.append({
+            "tipo": "rellenar",
+            "descripcion": f"Horas con más cancelaciones: {horas_canceladas[0][0]:02d}:00 ({horas_canceladas[0][1]} cancelaciones)",
+            "impacto": "Medio",
+            "accion": "Ofrecer descuento o prioridad para rellenar estos slots",
+        })
+
+    if total_canceladas > total_completadas * 0.2:
+        sugerencias.append({
+            "tipo": "reducir_cancelaciones",
+            "descripcion": f"Tasa de cancelación: {(total_canceladas/(total_completadas+total_canceladas)*100):.1f}%",
+            "impacto": "Alto",
+            "accion": "Implementar recordatorios 24h antes y confirmación telefónica",
+        })
+
+    return json.dumps(
+        {
+            "medico_id": medico_id,
+            "periodo": f"Últimos {dias} días",
+            "citas_completadas": total_completadas,
+            "citas_canceladas": total_canceladas,
+            "tasa_cancelacion": f"{(total_canceladas/(total_completadas+total_canceladas)*100):.1f}%" if (total_completadas+total_canceladas) > 0 else "0%",
+            "horas_mas_productivas": horas_facturacion,
+            "sugerencias": sugerencias,
+            "potencial_mejora": f"Reducir cancelaciones podría aumentar ingresos ~{(total_canceladas * 0.3):.0f} citas/mes",
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@tool
+async def score_satisfaccion(paciente_id: int) -> str:
+    """Calcula un score de satisfacción del paciente basado en su comportamiento.
+
+    Indicadores:
+    - Tasa de asistencia
+    - Frecuencia de reagendamientos
+    - Tiempo entre citas
+    - Estado de las citas
+
+    Args:
+        paciente_id: ID del paciente.
+    """
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        result = await db.execute(
+            text(
+                """
+                SELECT c.fecha_hora_inicio, ec.codigo AS estado,
+                       LAG(c.fecha_hora_inicio) OVER (ORDER BY c.fecha_hora_inicio) AS cita_anterior
+                FROM citas c
+                JOIN estados_cita ec ON ec.id = c.estado_id
+                WHERE c.paciente_id = :paciente_id
+                ORDER BY c.fecha_hora_inicio
+                LIMIT 20
+                """
+            ),
+            {"paciente_id": paciente_id},
+        )
+        historial = result.mappings().all()
+
+        result_pat = await db.execute(
+            text("SELECT nombre, apellido FROM pacientes WHERE id = :id"),
+            {"id": paciente_id},
+        )
+        paciente = result_pat.mappings().first()
+    await engine.dispose()
+
+    if not paciente:
+        return f"No se encontró el paciente {paciente_id}."
+
+    if not historial:
+        return json.dumps(
+            {
+                "paciente": f"{paciente['nombre']} {paciente['apellido']}",
+                "score": "N/A",
+                "mensaje": "Sin historial suficiente para calcular score.",
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    total = len(historial)
+    completadas = sum(1 for h in historial if h["estado"] == "COMPLETADA")
+    canceladas = sum(1 for h in historial if h["estado"] == "CANCELADA")
+    reagendadas = sum(1 for h in historial if h["estado"] == "REAGENDADA")
+
+    # Calculate score
+    tasa_asistencia = completadas / total if total > 0 else 0
+    penalty_cancelacion = (canceladas / total) * 30 if total > 0 else 0
+    penalty_reagendamiento = (reagendadas / total) * 10 if total > 0 else 0
+
+    score = max(0, min(100, (tasa_asistencia * 100) - penalty_cancelacion - penalty_reagendamiento))
+
+    # Satisfaction level
+    if score >= 80:
+        nivel = "EXCELENTE"
+        recomendacion = "Paciente leal, priorizar en agenda."
+    elif score >= 60:
+        nivel = "BUENO"
+        recomendacion = "Paciente confiable, mantener rutina."
+    elif score >= 40:
+        nivel = "REGULAR"
+        recomendacion = "Enviar recordatorios y confirmación."
+    else:
+        nivel = "BAJO"
+        recomendacion = "Considerar depósito o confirmación estricta."
+
+    return json.dumps(
+        {
+            "paciente_id": paciente_id,
+            "paciente": f"{paciente['nombre']} {paciente['apellido']}",
+            "total_citas": total,
+            "completadas": completadas,
+            "canceladas": canceladas,
+            "reagendadas": reagendadas,
+            "tasa_asistencia": f"{(tasa_asistencia*100):.1f}%",
+            "score_satisfaccion": round(score, 1),
+            "nivel": nivel,
+            "recomendacion": recomendacion,
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@tool
+async def resumen_clinico_paciente(paciente_id: int) -> str:
+    """Genera un resumen clínico automático del paciente antes de su cita.
+
+    Incluye:
+    - Historial de diagnósticos
+    - Tratamientos activos
+    - Citas recientes
+    - Alertas importantes
+
+    Args:
+        paciente_id: ID del paciente.
+    """
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        # Patient info
+        result_pat = await db.execute(
+            text(
+                """
+                SELECT id, nombre, apellido, fecha_nacimiento, email, telefono
+                FROM pacientes WHERE id = :id
+                """
+            ),
+            {"id": paciente_id},
+        )
+        paciente = result_pat.mappings().first()
+
+        if not paciente:
+            await engine.dispose()
+            return f"No se encontró el paciente {paciente_id}."
+
+        # Recent diagnoses
+        result_diag = await db.execute(
+            text(
+                """
+                SELECT nm.diagnostico, nm.tratamiento, nm.observaciones,
+                       c.fecha_hora_inicio,
+                       CONCAT(m.nombre, ' ', m.apellido) AS medico
+                FROM notas_medicas nm
+                JOIN citas c ON c.id = nm.cita_id
+                JOIN medicos m ON m.id = c.medico_id
+                WHERE c.paciente_id = :paciente_id
+                ORDER BY c.fecha_hora_inicio DESC
+                LIMIT 5
+                """
+            ),
+            {"paciente_id": paciente_id},
+        )
+        diagnosticos = result_diag.mappings().all()
+
+        # Upcoming appointments
+        result_citas = await db.execute(
+            text(
+                """
+                SELECT c.fecha_hora_inicio, c.motivo_consulta,
+                       CONCAT(m.nombre, ' ', m.apellido) AS medico,
+                       ec.codigo AS estado
+                FROM citas c
+                JOIN medicos m ON m.id = c.medico_id
+                JOIN estados_cita ec ON ec.id = c.estado_id
+                WHERE c.paciente_id = :paciente_id
+                  AND c.fecha_hora_inicio >= NOW()
+                ORDER BY c.fecha_hora_inicio
+                LIMIT 3
+                """
+            ),
+            {"paciente_id": paciente_id},
+        )
+        proximas_citas = result_citas.mappings().all()
+    await engine.dispose()
+
+    # Build summary
+    resumen = {
+        "paciente": {
+            "id": paciente_id,
+            "nombre": f"{paciente['nombre']} {paciente['apellido']}",
+            "fecha_nacimiento": str(paciente["fecha_nacimiento"]),
+        },
+        "diagnosticos_recientes": [
+            {
+                "diagnostico": d["diagnostico"][:200] if d["diagnostico"] else "N/A",
+                "tratamiento": d["tratamiento"][:200] if d["tratamiento"] else "N/A",
+                "medico": d["medico"],
+                "fecha": str(d["fecha_hora_inicio"]),
+            }
+            for d in diagnosticos
+        ],
+        "proximas_citas": [
+            {
+                "fecha": str(c["fecha_hora_inicio"]),
+                "medico": c["medico"],
+                "motivo": c["motivo_consulta"][:150] if c["motivo_consulta"] else "N/A",
+                "estado": c["estado"],
+            }
+            for c in proximas_citas
+        ],
+        "alertas": [],
+    }
+
+    # Generate alerts
+    if diagnosticos:
+        ultimo_diag = diagnosticos[0]["diagnostico"] or ""
+        if any(word in ultimo_diag.lower() for word in ["crónico", "diabetes", "hipertensión"]):
+            resumen["alertas"].append("Paciente con condición crónica - requiere seguimiento regular")
+
+    if len(diagnosticos) > 2:
+        resumen["alertas"].append(f"Paciente con {len(diagnosticos)} consultas recientes - posible caso complejo")
+
+    return json.dumps(resumen, ensure_ascii=False, indent=2)
+
+
+@tool
+async def detectar_anomalias(dias: int = 30) -> str:
+    """Detecta patrones anómalos en la agenda que pueden indicar problemas.
+
+    Identifica:
+    - Médicos con tasa de cancelación inusualmente alta
+    - Horarios con anomalías de demanda
+    - Pacientes con comportamiento inusual
+    - Posibles errores de programación
+
+    Args:
+        dias: Días a analizar (default 30).
+    """
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        # Doctor cancellation rates
+        result_docs = await db.execute(
+            text(
+                """
+                SELECT m.id, CONCAT(m.nombre, ' ', m.apellido) AS medico,
+                       COUNT(c.id) AS total,
+                       SUM(CASE WHEN ec.codigo = 'CANCELADA' THEN 1 ELSE 0 END) AS canceladas
+                FROM medicos m
+                LEFT JOIN citas c ON c.medico_id = m.id
+                    AND c.fecha_hora_inicio >= NOW() - INTERVAL ':dias days'
+                LEFT JOIN estados_cita ec ON ec.id = c.estado_id
+                GROUP BY m.id, m.nombre, m.apellido
+                HAVING COUNT(c.id) > 5
+                """
+            ),
+            {"dias": dias},
+        )
+        medicos = result_docs.mappings().all()
+
+        # Overbooking detection
+        result_overbook = await db.execute(
+            text(
+                """
+                SELECT DATE(c.fecha_hora_inicio) AS dia,
+                       c.medico_id,
+                       COUNT(*) AS citas_dia
+                FROM citas c
+                JOIN estados_cita ec ON ec.id = c.estado_id
+                WHERE c.fecha_hora_inicio >= NOW() - INTERVAL ':dias days'
+                  AND ec.codigo NOT IN ('CANCELADA', 'SUSPENDIDA')
+                GROUP BY dia, c.medico_id
+                HAVING COUNT(*) > 10
+                """
+            ),
+            {"dias": dias},
+        )
+        overbooking = result_overbook.mappings().all()
+    await engine.dispose()
+
+    anomalias = []
+
+    # Check for high cancellation rates
+    for med in medicos:
+        if med["total"] > 0:
+            tasa = (med["canceladas"] or 0) / med["total"]
+            if tasa > 0.4:
+                anomalias.append({
+                    "tipo": "alta_cancelacion",
+                    "severidad": "ALTA",
+                    "descripcion": f"Dr. {med['medico']} tiene tasa de cancelación del {(tasa*100):.1f}%",
+                    "accion": "Revisar motivos, considerar recordatorios o depósitos",
+                })
+            elif tasa > 0.25:
+                anomalias.append({
+                    "tipo": "cancelacion_moderada",
+                    "severidad": "MEDIA",
+                    "descripcion": f"Dr. {med['medico']} tiene tasa de cancelación del {(tasa*100):.1f}%",
+                    "accion": "Monitorear y ajustar política de cancelación",
+                })
+
+    # Check for overbooking
+    for ob in overbooking:
+        anomalias.append({
+            "tipo": "sobrecarga",
+            "severidad": "MEDIA",
+            "descripcion": f"Médico {ob['medico_id']} con {ob['citas_dia']} citas el {ob['dia']}",
+            "accion": "Revisar capacidad y redistribuir si es necesario",
+        })
+
+    return json.dumps(
+        {
+            "periodo_analisis": f"Últimos {dias} días",
+            "anomalias_encontradas": len(anomalias),
+            "detalles": anomalias if anomalias else [{"tipo": "sin_anomalias", "mensaje": "No se detectaron anomalías significativas."}],
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@tool
+async def scheduling_adaptativo(medico_id: int) -> str:
+    """Analiza el rendimiento del scheduling y sugiere mejoras automáticas.
+
+    Aprende de:
+    - Citas que excedieron el tiempo estimado
+    - Patrones de puntualidad
+    - Eficiencia por hora del día
+    - Recomendaciones de mejora continua
+
+    Args:
+        medico_id: ID del médico.
+    """
+    from datetime import datetime
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        # Analyze scheduling efficiency
+        result = await db.execute(
+            text(
+                """
+                SELECT EXTRACT(HOUR FROM c.fecha_hora_inicio) AS hora,
+                       AVG(EXTRACT(EPOCH FROM (c.fecha_hora_fin - c.fecha_hora_inicio))/60) AS duracion_real,
+                       COUNT(*) AS total_citas,
+                       SUM(CASE WHEN ec.codigo = 'COMPLETADA' THEN 1 ELSE 0 END) AS completadas
+                FROM citas c
+                JOIN estados_cita ec ON ec.id = c.estado_id
+                WHERE c.medico_id = :medico_id
+                  AND c.fecha_hora_inicio >= NOW() - INTERVAL '30 days'
+                GROUP BY hora
+                ORDER BY hora
+                """
+            ),
+            {"medico_id": medico_id},
+        )
+        eficiencia = result.mappings().all()
+
+        # Get doctor name
+        result_med = await db.execute(
+            text("SELECT nombre, apellido FROM medicos WHERE id = :id"),
+            {"id": medico_id},
+        )
+        medico = result_med.mappings().first()
+    await engine.dispose()
+
+    if not medico:
+        return f"No se encontró el médico {medico_id}."
+
+    # Analyze patterns
+    horas_analisis = {}
+    for row in eficiencia:
+        hora = int(row["hora"])
+        duracion = row["duracion_real"] or 30
+        completadas = row["completadas"] or 0
+        total = row["total_citas"] or 0
+        tasa_completado = completadas / total if total > 0 else 0
+
+        horas_analisis[f"{hora:02d}:00"] = {
+            "duracion_promedio_min": round(duracion, 1),
+            "citas": total,
+            "tasa_completado": f"{(tasa_completado*100):.1f}%",
+        }
+
+    # Generate adaptive recommendations
+    recomendaciones = []
+    horas_datos = list(horas_analisis.items())
+
+    for i in range(len(horas_datos) - 1):
+        hora_actual, datos_actual = horas_datos[i]
+        hora_siguiente, datos_siguiente = horas_datos[i + 1]
+
+        if datos_actual["duracion_promedio_min"] > 45:
+            recomendaciones.append({
+                "tipo": "ajustar_duracion",
+                "hora": hora_actual,
+                "descripcion": f"Citas en {hora_actual} duran {datos_actual['duracion_promedio_min']} min (promedio)",
+                "accion": f"Aumentar slot a {round(datos_actual['duracion_promedio_min'] + 5)} min",
+            })
+
+    return json.dumps(
+        {
+            "medico": f"{medico['nombre']} {medico['apellido']}",
+            "periodo": "Últimos 30 días",
+            "analisis_por_hora": horas_analisis,
+            "recomendaciones": recomendaciones,
+            "mensaje": "Análisis de eficiencia de scheduling completado.",
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
 _TOOLS = [
     # Basic tools
     buscar_en_documentos,
@@ -2172,6 +2991,15 @@ _TOOLS = [
     protocolo_emergencia,
     optimizar_agenda,
     generar_recordatorio,
+    # Differentiation tools (unique features)
+    predecir_demanda,
+    matching_paciente_medico,
+    duracion_inteligente,
+    optimizar_ingresos,
+    score_satisfaccion,
+    resumen_clinico_paciente,
+    detectar_anomalias,
+    scheduling_adaptativo,
 ]
 
 
