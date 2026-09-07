@@ -75,7 +75,7 @@ async def create_cita(
     try:
         return await crud_cita.create_cita(db, cita=cita_in)
     except ValueError as exc:
-        raise _busy_error(exc)
+        raise _busy_error(exc) from exc
 
 
 @router.get(
@@ -120,7 +120,7 @@ async def reagendar_cita(
     try:
         return await crud_cita.reagendar_cita(db, db_cita, cita_in)
     except ValueError as exc:
-        raise _busy_error(exc)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.patch(
@@ -146,7 +146,7 @@ async def change_cita_estado(
     try:
         return await crud_cita.change_estado(db, db_cita, cambio)
     except ValueError as exc:
-        raise _busy_error(exc)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.delete(
@@ -206,11 +206,15 @@ async def create_nota(
     if not cita:
         raise HTTPException(status_code=404, detail="Appointment not found.")
     if await crud_nota_medica.get_nota_by_cita(db, nota_in.cita_id):
-        raise HTTPException(status_code=400, detail="The appointment already has a medical note.")
+        raise HTTPException(
+            status_code=400, detail="The appointment already has a medical note."
+        )
     try:
         return await crud_nota_medica.create_nota(db, nota=nota_in)
     except IntegrityError:
-        raise HTTPException(status_code=400, detail="The appointment already has a medical note.")
+        raise HTTPException(
+            status_code=400, detail="The appointment already has a medical note."
+        ) from None
 
 
 @router.get(
