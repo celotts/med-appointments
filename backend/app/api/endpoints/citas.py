@@ -204,11 +204,32 @@ async def create_nota(
             status_code=400, detail="The appointment already has a medical note."
         )
     try:
-        return await crud_nota_medica.create_nota(db, nota=nota_in)
+        nota = await crud_nota_medica.create_nota(db, nota=nota_in)
     except IntegrityError:
         raise HTTPException(
             status_code=400, detail="The appointment already has a medical note."
         ) from None
+
+    # Auto-ingest into vector store (fire-and-forget)
+    try:
+        from core.rag import ingest_documento
+
+        contenido_parts = [f"Diagnosis: {nota_in.diagnostico}"]
+        if nota_in.tratamiento:
+            contenido_parts.append(f"Treatment: {nota_in.tratamiento}")
+        if nota_in.observaciones:
+            contenido_parts.append(f"Observations: {nota_in.observaciones}")
+        await ingest_documento(
+            db,
+            ref_tipo="NOTA_MEDICA",
+            ref_id=nota.id,
+            titulo=f"Medical note appointment #{nota_in.cita_id}",
+            contenido="\n".join(contenido_parts),
+        )
+    except Exception:
+        pass  # Non-blocking: log in production
+
+    return nota
 
 
 @router.get(

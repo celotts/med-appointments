@@ -1,12 +1,14 @@
 """RAG agent endpoints and vector document management."""
 
+import json
 from typing import Any
 
-from core.agent import chat_con_agente
+from core.agent import chat_con_agente, chat_con_agente_stream
 from core.config import settings
 from core.rag import ingest_documento, search_documentos
 from dependencies import get_current_user, get_db
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from models.user import User as UserModel
 from schemas.rag import (
     ChatRequest,
@@ -169,3 +171,33 @@ async def chat(
         return ChatResponse(respuesta=respuesta)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Agent error: {exc}")
+
+
+@router.post(
+    "/rag/chat/stream",
+    summary="Chat with the MedAssist agent (streaming SSE)",
+)
+async def chat_stream(
+    *,
+    db: AsyncSession = Depends(get_db),
+    chat_in: ChatRequest,
+    current_user: UserModel = Depends(get_current_user),
+) -> StreamingResponse:
+    """Streams agent response token-by-token using Server-Sent Events."""
+    historial = None
+    if chat_in.historial:
+        historial = [{"role": m.role, "content": m.content} for m in chat_in.historial]
+
+    async def event_generator():
+        try:
+            async for chunk in chat_con_agente_stream(
+                chat_in.message,
+                conn_str=settings.DATABASE_URL,
+                historial=historial,
+            ):
+                yield f"data: {json.dumps({'token': chunk})}\n\n"
+            yield f"data: {json.dumps({'done': True})}\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

@@ -1,6 +1,7 @@
 """Agente conversacional RAG + herramientas de agendamiento con LangChain + Ollama."""
 
 import json
+import re
 
 from core.config import settings
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
@@ -8,20 +9,66 @@ from langchain_core.tools import tool
 from langchain_ollama import ChatOllama
 from sqlalchemy import text
 
-_SYSTEM_PROMPT = """Eres MedAssist, un asistente inteligente de gestión de citas médicas.
+# Prompt injection patterns (case-insensitive)
+_INJECTION_PATTERNS = [
+    r"ignore\s+(all\s+)?(previous|prior|above)\s+(instructions?|prompts?|rules?)",
+    r"you\s+are\s+now\s+",
+    r"act\s+as\s+if\s+",
+    r"pretend\s+you\s+are\s+",
+    r"disregard\s+(all\s+)?(previous|prior|above)",
+    r"forget\s+(all\s+)?(previous|prior|above)",
+    r"new\s+instructions?:",
+    r"system\s*:\s*",
+    r"assistant\s*:\s*",
+    r"<\|system\|>",
+    r"<\|user\|>",
+    r"<\|assistant\|>",
+    r"###\s*system",
+    r"###\s*human",
+    r"override\s+safety",
+    r"bypass\s+(safety|filter|restriction)",
+    r"you\s+must\s+not\s+refuse",
+    r"do\s+not\s+follow\s+(your|any)\s+(rules?|guidelines?)",
+    r"reveal\s+(your|the)\s+(system\s+)?prompt",
+    r"what\s+are\s+your\s+(system\s+)?(instructions?|prompts?|rules?)",
+]
 
-Puedes:
-1. Responder preguntas sobre el calendario de citas de médicos y pacientes.
-2. Buscar en notas médicas y documentos vectoriales usando búsqueda semántica.
-3. Ayudar a reagendar o cancelar citas (solo con confirmación del usuario).
-4. Resumir información médica de notas clínicas.
 
-Reglas:
+def _detect_injection(text_input: str) -> str | None:
+    """Returns a warning message if prompt injection is detected, else None."""
+    lower = text_input.lower()
+    for pattern in _INJECTION_PATTERNS:
+        if re.search(pattern, lower, re.IGNORECASE):
+            return (
+                "Tu mensaje fue bloqueado por contener patrones no permitidos. "
+                "Por favor, haz una pregunta relacionada con citas médicas o información clínica."
+            )
+    return None
+
+
+_SYSTEM_PROMPT = """Eres MedAssist, un asistente inteligente de gestión de citas médicas con capacidades avanzadas de IA.
+
+CAPACIDADES PRINCIPALES:
+1. Gestión de citas: crear, consultar, reagendar, cancelar citas médicas.
+2. Búsqueda semántica: buscar en notas médicas y documentos clínicos vectorizados.
+3. Análisis de agenda: sugerir horarios óptimos, detectar conflictos, analizar carga de trabajo.
+4. Patrones predictivos: analizar comportamiento de pacientes para mejorar asistencia.
+5. Resumen de notas clínicas: extraer información relevante de diagnósticos y tratamientos.
+
+HERRAMIENTAS INTELIGENTES DE AGENDA:
+- sugerir_horarios_disponibles: Encuentra slots vacíos para un médico en una fecha específica.
+- analizar_carga_medico: Muestra estadísticas de ocupación y sugiere días con menor carga.
+- detectar_conflictos: Identifica citas superpuestas y propone soluciones.
+- analizar_patrones_paciente: Identifica preferencias de días/horarios y tasa de cancelaciones.
+
+REGLAS:
 - Sé conciso y profesional.
 - Si no tienes suficiente información, indica qué dato falta.
 - Nunca inventes diagnósticos, tratamientos ni datos médicos.
 - Al reagendar, valida que el usuario confirme explícitamente.
 - Usa las herramientas disponibles para consultar la base de datos en tiempo real.
+- Para conflictos, siempre sugiere alternativas concretas.
+- Al analizar patrones, provide recomendaciones accionables.
 - Responde en español.
 """
 
@@ -417,16 +464,362 @@ async def contar_registros() -> str:
     return json.dumps(dict(row), ensure_ascii=False)
 
 
+# ============================================================================
+# AGENDA IA: HERRAMIENTAS INTELIGENTES DE PROGRAMACIÓN
+# ============================================================================
+
+
+@tool
+async def sugerir_horarios_disponibles(
+    medico_id: int, fecha: str, duracion_min: int = 30
+) -> str:
+    """Sugiere horarios disponibles para un médico en una fecha específica.
+
+    Analiza la agenda existente y encuentra slots vacíos considerando:
+    - Horario laboral típico (08:00-14:00, 16:00-20:00)
+    - Citas ya programadas
+    - Duración de la nueva cita
+
+    Args:
+        medico_id: ID del médico.
+        fecha: Fecha a consultar en formato YYYY-MM-DD.
+        duracion_min: Duración de la cita en minutos (default 30).
+    """
+    from datetime import datetime, timedelta
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        # Get existing appointments for the doctor on that date
+        result = await db.execute(
+            text(
+                """
+                SELECT c.fecha_hora_inicio, c.fecha_hora_fin
+                FROM citas c
+                JOIN estados_cita ec ON ec.id = c.estado_id
+                WHERE c.medico_id = :medico_id
+                  AND DATE(c.fecha_hora_inicio) = :fecha
+                  AND ec.codigo NOT IN ('CANCELADA', 'SUSPENDIDA')
+                ORDER BY c.fecha_hora_inicio
+                """
+            ),
+            {"medico_id": medico_id, "fecha": fecha},
+        )
+        occupied = result.mappings().all()
+    await engine.dispose()
+
+    # Parse date and generate potential slots
+    date_obj = datetime.strptime(fecha, "%Y-%m-%d").date()
+    morning_start = datetime.combine(date_obj, datetime.min.time().replace(hour=8))
+    morning_end = datetime.combine(date_obj, datetime.min.time().replace(hour=14))
+    afternoon_start = datetime.combine(date_obj, datetime.min.time().replace(hour=16))
+    afternoon_end = datetime.combine(date_obj, datetime.min.time().replace(hour=20))
+
+    # Generate 30-min slots
+    potential_slots = []
+    current = morning_start
+    while current + timedelta(minutes=duracion_min) <= morning_end:
+        potential_slots.append(current)
+        current += timedelta(minutes=30)
+    current = afternoon_start
+    while current + timedelta(minutes=duracion_min) <= afternoon_end:
+        potential_slots.append(current)
+        current += timedelta(minutes=30)
+
+    # Filter out occupied slots
+    available = []
+    for slot in potential_slots:
+        slot_end = slot + timedelta(minutes=duracion_min)
+        is_free = True
+        for occ in occupied:
+            occ_start = occ["fecha_hora_inicio"]
+            occ_end = occ["fecha_hora_fin"]
+            if slot < occ_end and slot_end > occ_start:
+                is_free = False
+                break
+        if is_free:
+            available.append(slot)
+
+    if not available:
+        return f"No hay horarios disponibles para el médico {medico_id} el {fecha} con duración de {duracion_min} min."
+
+    # Format response
+    slots_json = [
+        {
+            "hora_inicio": s.strftime("%H:%M"),
+            "hora_fin": (s + timedelta(minutes=duracion_min)).strftime("%H:%M"),
+            "sugerencia": s.strftime("%Y-%m-%dT%H:%M:%S"),
+        }
+        for s in available[:8]  # Limit to 8 suggestions
+    ]
+
+    return json.dumps(
+        {
+            "medico_id": medico_id,
+            "fecha": fecha,
+            "duracion_min": duracion_min,
+            "horarios_disponibles": slots_json,
+            "total_disponibles": len(available),
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@tool
+async def analizar_carga_medico(medico_id: int, dias: int = 7) -> str:
+    """Analiza la carga de trabajo de un médico en los próximos N días.
+
+    Retorna estadísticas de ocupación y sugiere días con menor carga.
+
+    Args:
+        medico_id: ID del médico.
+        dias: Número de días a analizar (default 7).
+    """
+    from datetime import datetime, timedelta
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        result = await db.execute(
+            text(
+                """
+                SELECT DATE(c.fecha_hora_inicio) AS dia,
+                       COUNT(*) AS total_citas,
+                       SUM(EXTRACT(EPOCH FROM (c.fecha_hora_fin - c.fecha_hora_inicio))/60) AS minutos_ocupados
+                FROM citas c
+                JOIN estados_cita ec ON ec.id = c.estado_id
+                WHERE c.medico_id = :medico_id
+                  AND c.fecha_hora_inicio >= NOW()
+                  AND c.fecha_hora_inicio < NOW() + INTERVAL ':dias days'
+                  AND ec.codigo NOT IN ('CANCELADA', 'SUSPENDIDA')
+                GROUP BY DATE(c.fecha_hora_inicio)
+                ORDER BY dia
+                """
+            ),
+            {"medico_id": medico_id, "dias": dias},
+        )
+        daily_load = result.mappings().all()
+
+        # Get doctor info
+        result_med = await db.execute(
+            text(
+                "SELECT nombre, apellido FROM medicos WHERE id = :id"
+            ),
+            {"id": medico_id},
+        )
+        medico = result_med.mappings().first()
+    await engine.dispose()
+
+    if not medico:
+        return f"No se encontró el médico {medico_id}."
+
+    # Calculate stats
+    total_citas = sum(r["total_citas"] for r in daily_load)
+    total_minutos = sum(r["minutos_ocupados"] or 0 for r in daily_load)
+    promedio_citas = total_citas / dias if dias > 0 else 0
+
+    # Find lightest day
+    dias_carga = {str(r["dia"]): r["total_citas"] for r in daily_load}
+    dia_leve = min(dias_carga, key=dias_carga.get) if dias_carga else None
+
+    return json.dumps(
+        {
+            "medico": f"{medico['nombre']} {medico['apellido']}",
+            "periodo": f"Próximos {dias} días",
+            "total_citas": total_citas,
+            "total_horas": round(total_minutos / 60, 1),
+            "promedio_citas_dia": round(promedio_citas, 1),
+            "carga_por_dia": dias_carga,
+            "dia_mas_disponible": dia_leve,
+            "cita_mas_corta": "30 min" if total_citas > 0 else "N/A",
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@tool
+async def detectar_conflictos(fecha_inicio: str, fecha_fin: str) -> str:
+    """Detecta conflictos de horario en un rango de fechas.
+
+    Busca citas superpuestas y sugiere soluciones automáticas.
+
+    Args:
+        fecha_inicio: Fecha/hora inicio del rango (ISO 8601).
+        fecha_fin: Fecha/hora fin del rango (ISO 8601).
+    """
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        result = await db.execute(
+            text(
+                """
+                SELECT c.id, c.fecha_hora_inicio, c.fecha_hora_fin,
+                       CONCAT(p.nombre, ' ', p.apellido) AS paciente,
+                       CONCAT(m.nombre, ' ', m.apellido) AS medico,
+                       ec.codigo AS estado
+                FROM citas c
+                JOIN pacientes p ON p.id = c.paciente_id
+                JOIN medicos m ON m.id = c.medico_id
+                JOIN estados_cita ec ON ec.id = c.estado_id
+                WHERE c.fecha_hora_inicio < :fecha_fin
+                  AND c.fecha_hora_fin > :fecha_inicio
+                  AND ec.codigo NOT IN ('CANCELADA', 'SUSPENDIDA')
+                ORDER BY c.medico_id, c.fecha_hora_inicio
+                """
+            ),
+            {"fecha_inicio": fecha_inicio, "fecha_fin": fecha_fin},
+        )
+        conflicts = result.mappings().all()
+    await engine.dispose()
+
+    if not conflicts:
+        return "No se detectaron conflictos de horario en el rango especificado."
+
+    # Group by doctor
+    by_medico = {}
+    for c in conflicts:
+        med = c["medico"]
+        if med not in by_medico:
+            by_medico[med] = []
+        by_medico[med].append(c)
+
+    # Find overlapping pairs
+    conflictos = []
+    for medico, citas in by_medico.items():
+        for i in range(len(citas)):
+            for j in range(i + 1, len(citas)):
+                c1, c2 = citas[i], citas[j]
+                if c1["fecha_hora_inicio"] < c2["fecha_hora_fin"] and c2["fecha_hora_inicio"] < c1["fecha_hora_fin"]:
+                    conflictos.append(
+                        {
+                            "medico": medico,
+                            "cita_1": {
+                                "id": c1["id"],
+                                "paciente": c1["paciente"],
+                                "inicio": str(c1["fecha_hora_inicio"]),
+                                "fin": str(c1["fecha_hora_fin"]),
+                            },
+                            "cita_2": {
+                                "id": c2["id"],
+                                "paciente": c2["paciente"],
+                                "inicio": str(c2["fecha_hora_inicio"]),
+                                "fin": str(c2["fecha_hora_fin"]),
+                            },
+                            "sugerencia": f"Reagendar cita #{c2['id']} a otro horario",
+                        }
+                    )
+
+    return json.dumps(
+        {
+            "conflictos_encontrados": len(conflictos),
+            "detalles": conflictos,
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@tool
+async def analizar_patrones_paciente(nombre_paciente: str = "") -> str:
+    """Analiza patrones de citas de un paciente para predecir comportamiento.
+
+    Identifica:
+    - Días de la semana preferidos
+    - Horarios preferidos
+    - Tasa de cancelaciones
+    - Frecuencia de reagendamientos
+
+    Args:
+        nombre_paciente: Nombre o apellido del paciente.
+    """
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        result = await db.execute(
+            text(
+                """
+                SELECT c.fecha_hora_inicio,
+                       ec.codigo AS estado,
+                       EXTRACT(DOW FROM c.fecha_hora_inicio) AS dia_semana,
+                       EXTRACT(HOUR FROM c.fecha_hora_inicio) AS hora
+                FROM citas c
+                JOIN pacientes p ON p.id = c.paciente_id
+                JOIN estados_cita ec ON ec.id = c.estado_id
+                WHERE (p.nombre ILIKE :q OR p.apellido ILIKE :q
+                       OR CONCAT(p.nombre, ' ', p.apellido) ILIKE :q)
+                ORDER BY c.fecha_hora_inicio DESC
+                LIMIT 50
+                """
+            ),
+            {"q": f"%{nombre_paciente}%"},
+        )
+        citas = result.mappings().all()
+    await engine.dispose()
+
+    if not citas:
+        return f"No se encontraron citas para '{nombre_paciente}'."
+
+    # Analyze patterns
+    dias_semana = {0: "Dom", 1: "Lun", 2: "Mar", 3: "Mié", 4: "Jue", 5: "Vie", 6: "Sáb"}
+    dia_counts = {}
+    hora_counts = {}
+    total = len(citas)
+    canceladas = sum(1 for c in citas if c["estado"] == "CANCELADA")
+    reagendadas = sum(1 for c in citas if c["estado"] == "REAGENDADA")
+
+    for c in citas:
+        dia = dias_semana.get(c["dia_semana"], "?")
+        dia_counts[dia] = dia_counts.get(dia, 0) + 1
+        hora = c["hora"]
+        hora_counts[f"{int(hora):02d}:00"] = hora_counts.get(f"{int(hora):02d}:00", 0) + 1
+
+    dia_preferido = max(dia_counts, key=dia_counts.get) if dia_counts else "N/A"
+    hora_preferida = max(hora_counts, key=hora_counts.get) if hora_counts else "N/A"
+
+    return json.dumps(
+        {
+            "paciente": nombre_paciente,
+            "total_citas": total,
+            "dias_preferidos": dia_counts,
+            "dia_mas_frecuente": dia_preferido,
+            "horarios_preferidos": hora_counts,
+            "hora_mas_frecuente": hora_preferida,
+            "tasa_cancelacion": f"{(canceladas/total*100):.1f}%" if total > 0 else "0%",
+            "tasa_reagendamiento": f"{(reagendadas/total*100):.1f}%" if total > 0 else "0%",
+            "recomendacion": f"Para mayor asistencia, programar los {dia_preferido} a las {hora_preferida}.",
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
 _TOOLS = [
+    # Basic tools
     buscar_en_documentos,
     consultar_citas_paciente,
     consultar_citas_medico,
     buscar_pacientes,
     buscar_medicos,
     contar_registros,
+    # Scheduling tools
     sugerir_reagendamiento,
     ejecutar_reagendamiento,
     cancelar_cita,
+    # AI-powered scheduling tools
+    sugerir_horarios_disponibles,
+    analizar_carga_medico,
+    detectar_conflictos,
+    analizar_patrones_paciente,
 ]
 
 
@@ -445,6 +838,11 @@ async def chat_con_agente(
     """
     global _conn_str
     _conn_str = conn_str
+
+    # Anti-prompt-injection check
+    injection_warning = _detect_injection(mensaje_usuario)
+    if injection_warning:
+        return injection_warning
 
     llm = _get_llm()
     llm_con_tools = llm.bind_tools(_TOOLS)
@@ -486,3 +884,72 @@ async def chat_con_agente(
         reply = await llm_con_tools.ainvoke(messages)
 
     return reply.content
+
+
+async def chat_con_agente_stream(
+    mensaje_usuario: str,
+    *,
+    conn_str: str,
+    historial: list[dict[str, str]] | None = None,
+):
+    """Streams agent response token-by-token using LangChain astream.
+
+    Args:
+        mensaje_usuario: Pregunta o instrucción del usuario.
+        conn_str: DATABASE_URL para crear conexiones internas a la BD.
+        historial: Opcional, lista de mensajes anteriores [{role, content}].
+    """
+    global _conn_str
+    _conn_str = conn_str
+
+    # Anti-prompt-injection check
+    injection_warning = _detect_injection(mensaje_usuario)
+    if injection_warning:
+        yield injection_warning
+        return
+
+    llm = _get_llm()
+    llm_con_tools = llm.bind_tools(_TOOLS)
+
+    messages: list = [SystemMessage(content=_SYSTEM_PROMPT)]
+
+    if historial:
+        for msg in historial:
+            if msg.get("role") == "user":
+                messages.append(HumanMessage(content=msg["content"]))
+            elif msg.get("role") == "assistant":
+                messages.append(SystemMessage(content=msg["content"]))
+
+    messages.append(HumanMessage(content=mensaje_usuario))
+
+    # Initial invoke to check for tool calls
+    reply = await llm_con_tools.ainvoke(messages)
+
+    # Handle tool calls loop (non-streaming for tool execution)
+    for _ in range(6):
+        if not reply.tool_calls:
+            break
+
+        messages.append(reply)
+        for tool_call in reply.tool_calls:
+            tool_fn = next((t for t in _TOOLS if t.name == tool_call["name"]), None)
+            try:
+                if tool_fn is None:
+                    tool_result = f"Herramienta desconocida: {tool_call['name']}"
+                else:
+                    tool_result = await tool_fn.ainvoke(tool_call["args"])
+            except Exception as exc:  # noqa: BLE001
+                tool_result = (
+                    f"Error al ejecutar la herramienta: {exc}. "
+                    "Indica al usuario que se necesitan más datos."
+                )
+            messages.append(
+                ToolMessage(content=str(tool_result), tool_call_id=tool_call["id"])
+            )
+
+        reply = await llm_con_tools.ainvoke(messages)
+
+    # Stream the final response
+    async for chunk in llm.astream(messages):
+        if chunk.content:
+            yield chunk.content
