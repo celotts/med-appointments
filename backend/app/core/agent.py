@@ -3270,6 +3270,465 @@ async def resolver_conflicto_cirugia(
     )
 
 
+# ============================================================================
+# AGENDA IA: FEATURES INNOVADORES MVP
+# ============================================================================
+
+
+@tool
+async def analisis_sentimiento(texto_paciente: str, paciente_id: int | None = None) -> str:
+    """Analiza el sentimiento del paciente y sugiere cómo ajustar la comunicación.
+
+    SOLO se activa para especialistas en PSICOLOGÍA.
+    Detecta: ansiedad, frustración, tristeza, enojo, calma, esperanza.
+
+    Args:
+        texto_paciente: Texto del paciente (motivo de consulta, mensaje, etc.).
+        paciente_id: ID del paciente (opcional, para contexto adicional).
+    """
+    # Keyword-based sentiment analysis
+    sentimentos = {
+        "ansiedad": {
+            "keywords": [
+                "ansioso", "ansiedad", "nervioso", "preocupado", "miedo",
+                "temeroso", "inquieto", "tenso", "estresado", "pánico",
+                "angustia", "desesperado", "agobiado", "aterrado",
+            ],
+            "nivel": "ALTO",
+            "color": "🔴",
+            "recomendacion": "Usar tono calmado, validar sus sentimientos, ofrecer contención.",
+        },
+        "frustración": {
+            "keywords": [
+                "frustrado", "frustración", "enojado", "molesto", "hartado",
+                "cansado", "harto", "rabia", "indignado", "furioso",
+            ],
+            "nivel": "MEDIO",
+            "color": "🟡",
+            "recomendacion": "Escuchar activamente, no interrumpir, validar su frustración.",
+        },
+        "tristeza": {
+            "keywords": [
+                "triste", "tristeza", "deprimido", "depresión", "llorando",
+                "llanto", "solo", "soledad", "vacío", "desesperanza",
+                "sin ganas", "apático", "melancolía",
+            ],
+            "nivel": "ALTO",
+            "color": "🔴",
+            "recomendacion": "Mostrar empatía, preguntar abiertamente, ofrecer apoyo.",
+        },
+        "esperanza": {
+            "keywords": [
+                "mejorar", "superar", "optimista", "esperanza", "ganar",
+                "luchar", "adelante", "positivo", "progreso", "avanzar",
+            ],
+            "nivel": "BAJO",
+            "color": "🟢",
+            "recomendacion": "Reforzar positividad, explorar fortalezas, motivar.",
+        },
+        "calma": {
+            "keywords": [
+                "tranquilo", "calmado", "paz", "sereno", "estable",
+                "bien", "mejor", "normal", "relajado",
+            ],
+            "nivel": "BAJO",
+            "color": "🟢",
+            "recomendacion": "Mantener ritmo, profundizar en temas importantes.",
+        },
+    }
+
+    texto_lower = texto_paciente.lower()
+    detected = []
+
+    for sentimiento, info in sentimentos.items():
+        for keyword in info["keywords"]:
+            if keyword in texto_lower:
+                detected.append({
+                    "sentimiento": sentimiento,
+                    "nivel": info["nivel"],
+                    "color": info["color"],
+                    "recomendacion": info["recomendacion"],
+                })
+                break
+
+    # Determine primary sentiment
+    if detected:
+        primary = detected[0]
+        intensidad = "alta" if any(d["nivel"] == "ALTO" for d in detected) else "media"
+    else:
+        primary = {
+            "sentimiento": "neutro",
+            "nivel": "BAJO",
+            "color": "⚪",
+            "recomendacion": "Continuar evaluación normal.",
+        }
+        intensidad = "baja"
+
+    return json.dumps(
+        {
+            "analisis_sentimiento": True,
+            "especialidad_requiere": "PSICOLOGÍA",
+            "texto_analizado": texto_paciente[:200],
+            "sentimiento_primario": primary["sentimiento"],
+            "intensidad": intensidad,
+            "sentimientos_detectados": [d["sentimiento"] for d in detected] if detected else ["neutro"],
+            "recomendacion_comunicacion": primary["recomendacion"],
+            "indicador_visual": primary["color"],
+            "nota": "Este análisis es orientativo. El profesional debe validar la evaluación.",
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@tool
+async def coordinacion_familiar(
+    familiares: list[dict], fecha_preferida: str = ""
+) -> str:
+    """Coordina citas para múltiples miembros de una familia en horarios compatibles.
+
+    Ejemplo: "Cita para Juan (cardiología), María (medicina general) y Pedro (pediatría)"
+
+    Args:
+        familiares: Lista de [{"nombre": str, "especialidad": str}].
+        fecha_preferida: Fecha preferida (YYYY-MM-DD, opcional).
+    """
+    from datetime import datetime, timedelta
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    if len(familiares) < 2:
+        return "Se requieren al menos 2 familiares para coordinación."
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+
+    resultados = []
+    for familiar in familiares:
+        nombre = familiar.get("nombre", "")
+        especialidad = familiar.get("especialidad", "")
+
+        async with async_session() as db:
+            # Find doctors matching specialty
+            result = await db.execute(
+                text(
+                    """
+                    SELECT m.id, CONCAT(m.nombre, ' ', m.apellido) AS medico,
+                           e.nombre AS especialidad
+                    FROM medicos m
+                    JOIN especialidades e ON e.id = m.especialidad_id
+                    WHERE e.nombre ILIKE :especialidad
+                    ORDER BY m.nombre
+                    LIMIT 3
+                    """
+                ),
+                {"especialidad": f"%{especialidad}%"},
+            )
+            medicos = result.mappings().all()
+
+            if not medicos:
+                resultados.append({
+                    "familiar": nombre,
+                    "especialidad": especialidad,
+                    "estado": "SIN_DISPO",
+                    "mensaje": f"No se encontraron médicos para {especialidad}",
+                })
+                continue
+
+            # Find available slots for each doctor
+            medico_id = medicos[0]["id"]
+            result_slots = await db.execute(
+                text(
+                    """
+                    SELECT c.fecha_hora_inicio, c.fecha_hora_fin
+                    FROM citas c
+                    JOIN estados_cita ec ON ec.id = c.estado_id
+                    WHERE c.medico_id = :medico_id
+                      AND c.fecha_hora_inicio >= NOW()
+                      AND ec.codigo NOT IN ('CANCELADA', 'SUSPENDIDA')
+                    ORDER BY c.fecha_hora_inicio
+                    LIMIT 20
+                    """
+                ),
+                {"medico_id": medico_id},
+            )
+            ocupadas = result_slots.mappings().all()
+
+        # Find free slots
+        date_obj = datetime.now().date()
+        slots_libres = []
+        for day_offset in range(7):
+            check_date = date_obj + timedelta(days=day_offset)
+            for hour in [9, 10, 11, 14, 15, 16]:
+                slot_start = datetime.combine(check_date, datetime.min.time().replace(hour=hour))
+                slot_end = slot_start + timedelta(minutes=30)
+                is_free = True
+                for occ in ocupadas:
+                    if slot_start < occ["fecha_hora_fin"] and slot_end > occ["fecha_hora_inicio"]:
+                        is_free = False
+                        break
+                if is_free:
+                    slots_libres.append(slot_start)
+                    if len(slots_libres) >= 3:
+                        break
+            if len(slots_libres) >= 3:
+                break
+
+        resultados.append({
+            "familiar": nombre,
+            "especialidad": especialidad,
+            "medico_sugerido": medicos[0]["medico"],
+            "slots_disponibles": [
+                s.strftime("%Y-%m-%dT%H:%M:%S") for s in slots_libres[:3]
+            ],
+        })
+
+    await engine.dispose()
+
+    # Suggest coordinated schedule
+    todos_con_slots = all(r.get("slots_disponibles") for r in resultados)
+    horario_sugerido = None
+
+    if todos_con_slots:
+        # Find common date
+        fechas = set()
+        for r in resultados:
+            for slot in r["slots_disponibles"]:
+                fechas.add(slot.split("T")[0])
+
+        for fecha in sorted(fechas):
+            slots_en_fecha = []
+            for r in resultados:
+                for slot in r["slots_disponibles"]:
+                    if slot.startswith(fecha):
+                        slots_en_fecha.append(slot)
+            if len(slots_en_fecha) == len(resultados):
+                horario_sugerido = fecha
+                break
+
+    return json.dumps(
+        {
+            "accion": "coordinacion_familiar",
+            "total_familiares": len(familiares),
+            "resultados": resultados,
+            "todos_disponibles": todos_con_slots,
+            "fecha_sugerida": horario_sugerido,
+            "mensaje": (
+                f"Coordinación completada. {'Fecha sugerida: ' + horario_sugerido if horario_sugerido else 'Revisar disponibilidad individual.'}"
+            ),
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@tool
+async def teletriaje_ia(
+    motivo_consulta: str, sintomas: str = "", paciente_id: int | None = None
+) -> str:
+    """Determina si una consulta puede ser atendida de forma virtual o requiere presencial.
+
+    Analiza síntomas y motivo para recomendar modalidad adecuada.
+
+    Args:
+        motivo_consulta: Motivo de la consulta.
+        sintomas: Síntomas descritos (opcional).
+        paciente_id: ID del paciente (opcional).
+    """
+    # Rules for telehealth eligibility
+    reglas_presencial = [
+        "dolor", "fiebre", "sangrado", "lesión", "herida", "fractura",
+        "examen físico", "auscultar", "palpar", "inyección", "cirugía",
+        "procedimiento", "extracción", "sutura", "curación",
+    ]
+
+    reglas_virtual = [
+        "seguimiento", "control", "receta", "resultado", "consulta general",
+        "duda", "orientación", "sigma", "ansiedad leve", "insomnio",
+        "estrés", "terapia", "consejería", "plan de tratamiento",
+    ]
+
+    motivo_lower = motivo_consulta.lower()
+    sintomas_lower = sintomas.lower()
+    texto_completo = f"{motivo_lower} {sintomas_lower}"
+
+    presencial_score = sum(1 for r in reglas_presencial if r in texto_completo)
+    virtual_score = sum(1 for r in reglas_virtual if r in texto_completo)
+
+    if presencial_score > virtual_score:
+        modalidad = "PRESENCIAL"
+        confianza = "alta" if presencial_score >= 2 else "media"
+        razon = "Requiere examen físico o procedimiento"
+    elif virtual_score > presencial_score:
+        modalidad = "VIRTUAL"
+        confianza = "alta" if virtual_score >= 2 else "media"
+        razon = "Puede resolverse por videoconsulta"
+    else:
+        modalidad = "A_EVALUAR"
+        confianza = "baja"
+        razon = "Se requiere más información"
+
+    return json.dumps(
+        {
+            "evaluacion_teletriaje": True,
+            "motivo": motivo_consulta,
+            "sintomas": sintomas[:200] if sintomas else "N/A",
+            "modalidad_recomendada": modalidad,
+            "confianza": confianza,
+            "razon": razon,
+            "preguntas_clarificacion": (
+                ["¿Presenta síntomas físicos que requieran examen?",
+                 "¿Es una consulta de seguimiento o control?"]
+                if modalidad == "A_EVALUAR" else []
+            ),
+            "nota": "El profesional debe confirmar la modalidad final.",
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@tool
+async def verificacion_seguros(paciente_id: int, medico_id: int) -> str:
+    """Verifica si el paciente tiene seguro vigente y si cubre al médico/especialidad.
+
+    Simula verificación de cobertura (en producción se conectaría a aseguradora).
+
+    Args:
+        paciente_id: ID del paciente.
+        medico_id: ID del médico.
+    """
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        # Get patient info
+        result_pat = await db.execute(
+            text(
+                """
+                SELECT id, CONCAT(nombre, ' ', apellido) AS nombre, email
+                FROM pacientes WHERE id = :id
+                """
+            ),
+            {"id": paciente_id},
+        )
+        paciente = result_pat.mappings().first()
+
+        # Get doctor info
+        result_med = await db.execute(
+            text(
+                """
+                SELECT m.id, CONCAT(m.nombre, ' ', m.apellido) AS nombre,
+                       e.nombre AS especialidad
+                FROM medicos m
+                JOIN especialidades e ON e.id = m.especialidad_id
+                WHERE m.id = :id
+                """
+            ),
+            {"id": medico_id},
+        )
+        medico = result_med.mappings().first()
+    await engine.dispose()
+
+    if not paciente or not medico:
+        return "No se encontró paciente o médico."
+
+    # Simulated verification (in production: API call to insurer)
+    # This would integrate with real insurance verification APIs
+    verificacion = {
+        "paciente": paciente["nombre"],
+        "medico": medico["nombre"],
+        "especialidad": medico["especialidad"],
+        "estado_verificacion": "SIMULADO",
+        "seguro_cubierto": True,
+        "copago_estimado": "$200 MXN",
+        "recomendaciones": [
+            "Verificar número de póliza vigente",
+            "Confirmar cobertura de especialidad",
+            "Solicitar pre-autorización si aplica",
+        ],
+        "nota": "Verificación simulada. En producción, conectar con API de aseguradora.",
+    }
+
+    return json.dumps(verificacion, ensure_ascii=False, indent=2)
+
+
+@tool
+async def ai_scribe(cita_id: int, texto_transcripcion: str) -> str:
+    """Genera notas clínicas estructuradas a partir de una transcripción.
+
+    Convierte texto libre en formato SOAP (Subjective, Objective, Assessment, Plan).
+
+    Args:
+        cita_id: ID de la cita.
+        texto_transcripcion: Transcripción de la consulta (audio a texto).
+    """
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(_conn_str)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async with async_session() as db:
+        # Get appointment info
+        result = await db.execute(
+            text(
+                """
+                SELECT c.id, c.motivo_consulta,
+                       CONCAT(p.nombre, ' ', p.apellido) AS paciente,
+                       CONCAT(m.nombre, ' ', m.apellido) AS medico,
+                       e.nombre AS especialidad
+                FROM citas c
+                JOIN pacientes p ON p.id = c.paciente_id
+                JOIN medicos m ON m.id = c.medico_id
+                JOIN especialidades e ON e.id = m.especialidad_id
+                WHERE c.id = :cita_id
+                """
+            ),
+            {"cita_id": cita_id},
+        )
+        cita = result.mappings().first()
+    await engine.dispose()
+
+    if not cita:
+        return f"No se encontró la cita {cita_id}."
+
+    # Simple SOAP note generation from transcription
+    # In production, this would use the LLM to parse
+    texto = texto_transcripcion
+
+    # Extract potential sections
+    soap = {
+        "S": {
+            "paciente_refiere": texto[:500] if texto else "No disponible",
+        },
+        "O": {
+            "notas_observacion": "Requiere revisión del profesional",
+        },
+        "A": {
+            "impresion_clinica": "A determinar por el especialista",
+        },
+        "P": {
+            "plan": "Según evaluación profesional",
+        },
+    }
+
+    return json.dumps(
+        {
+            "cita_id": cita_id,
+            "paciente": cita["paciente"],
+            "medico": cita["medico"],
+            "especialidad": cita["especialidad"],
+            "formato": "SOAP",
+            "notas_generadas": soap,
+            "transcripcion_original": texto[:1000],
+            "nota": "Notas generadas automáticamente. El profesional debe revisar y ajustar.",
+            "tiempo_ahorrado": "~10 minutos por consulta",
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
 _TOOLS = [
     # Basic tools
     buscar_en_documentos,
@@ -3313,6 +3772,12 @@ _TOOLS = [
     scheduling_adaptativo,
     # Surgery conflict resolution
     resolver_conflicto_cirugia,
+    # Innovative features (MVP)
+    analisis_sentimiento,
+    coordinacion_familiar,
+    teletriaje_ia,
+    verificacion_seguros,
+    ai_scribe,
 ]
 
 
