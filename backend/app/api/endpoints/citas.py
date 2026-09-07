@@ -1,5 +1,3 @@
-from typing import Any
-
 from core import crud_cita, crud_medico, crud_nota_medica, crud_paciente
 from dependencies import get_current_user, get_db
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,12 +17,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 router = APIRouter(prefix="/api/v1", tags=["Appointments"])
 
 
-def _busy_error(exc: ValueError) -> HTTPException:
-    if "cita en ese horario" in str(exc):
-        return HTTPException(status_code=409, detail=str(exc))
-    return HTTPException(status_code=400, detail=str(exc))
-
-
 @router.get(
     "/citas/",
     response_model=list[CitaOut],
@@ -38,7 +30,7 @@ async def read_citas(
     medico_id: int | None = None,
     estado: str | None = None,
     current_user: UserModel = Depends(get_current_user),
-) -> Any:
+) -> list[CitaOut]:
     """List of appointments with optional filters by patient, doctor, and status."""
     return await crud_cita.get_citas(
         db,
@@ -75,7 +67,9 @@ async def create_cita(
     try:
         return await crud_cita.create_cita(db, cita=cita_in)
     except ValueError as exc:
-        raise _busy_error(exc) from exc
+        if "cita en ese horario" in str(exc):
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get(
@@ -88,7 +82,7 @@ async def read_cita_by_id(
     cita_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
-) -> Any:
+) -> CitaOut:
     """Gets an appointment by ID."""
     cita = await crud_cita.get_cita(db, cita_id)
     if not cita:
@@ -112,7 +106,7 @@ async def reagendar_cita(
     cita_id: int,
     cita_in: CitaUpdate,
     current_user: UserModel = Depends(get_current_user),
-) -> Any:
+) -> CitaOut:
     """Reschedules an appointment and transitions it to RESCHEDULED status."""
     db_cita = await crud_cita.get_cita(db, cita_id)
     if not db_cita:
@@ -138,7 +132,7 @@ async def change_cita_estado(
     cita_id: int,
     cambio: CitaEstadoUpdate,
     current_user: UserModel = Depends(get_current_user),
-) -> Any:
+) -> CitaOut:
     """Changes appointment status following valid transitions."""
     db_cita = await crud_cita.get_cita(db, cita_id)
     if not db_cita:
@@ -180,7 +174,7 @@ async def read_notas(
     limit: int = 100,
     cita_id: int | None = None,
     current_user: UserModel = Depends(get_current_user),
-) -> Any:
+) -> list[NotaMedicaOut]:
     """List of medical notes, optionally filtered by appointment."""
     return await crud_nota_medica.get_notas(db, skip=skip, limit=limit, cita_id=cita_id)
 
@@ -227,7 +221,7 @@ async def read_nota_by_id(
     nota_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
-) -> Any:
+) -> NotaMedicaOut:
     """Gets a medical note by ID."""
     nota = await crud_nota_medica.get_nota(db, nota_id)
     if not nota:
@@ -247,7 +241,7 @@ async def update_nota(
     nota_id: int,
     nota_in: NotaMedicaUpdate,
     current_user: UserModel = Depends(get_current_user),
-) -> Any:
+) -> NotaMedicaOut:
     """Updates an existing medical note."""
     db_nota = await crud_nota_medica.get_nota(db, nota_id)
     if not db_nota:
@@ -266,7 +260,7 @@ async def delete_nota(
     db: AsyncSession = Depends(get_db),
     nota_id: int,
     current_user: UserModel = Depends(get_current_user),
-) -> Any:
+) -> NotaMedicaOut:
     """Deletes a medical note."""
     nota = await crud_nota_medica.delete_nota(db, nota_id)
     if not nota:
