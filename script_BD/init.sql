@@ -1,6 +1,7 @@
--- 1. Habilitar la extensión de vectores para pgvector
+-- 1. Enable vector extension for pgvector
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS vector;
+
 
 -- ============================================================================
 -- AUDIT TRIGGER FUNCTION
@@ -34,6 +35,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+
 -- ============================================================================
 -- ROLES AND USERS
 -- ============================================================================
@@ -51,9 +53,11 @@ CREATE TABLE roles (
     deleted_by_role_id UUID
 );
 
+
 CREATE TRIGGER trigger_roles_audit
 BEFORE INSERT OR UPDATE ON roles
 FOR EACH ROW EXECUTE FUNCTION set_audit_role_id();
+
 
 CREATE TABLE users (
     id UUID PRIMARY KEY,
@@ -76,14 +80,17 @@ CREATE TABLE users (
     deleted_by_role_id UUID REFERENCES roles(id)
 );
 
+
 CREATE TRIGGER trigger_users_audit
 BEFORE INSERT OR UPDATE ON users
 FOR EACH ROW EXECUTE FUNCTION set_audit_role_id();
+
 
 -- ============================================================================
 -- AUDIT LOGS
 -- ============================================================================
 CREATE TYPE audit_action AS ENUM ('INSERT', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT');
+
 
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY,
@@ -98,11 +105,11 @@ CREATE TABLE audit_logs (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+
 -- ============================================================================
 -- MEDICAL DOMAIN TABLES
 -- ============================================================================
 
--- Table: Specialties
 CREATE TABLE specialties (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
@@ -110,7 +117,7 @@ CREATE TABLE specialties (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Table: Doctors
+
 CREATE TABLE doctors (
     id SERIAL PRIMARY KEY,
     specialty_id INT NOT NULL,
@@ -124,7 +131,7 @@ CREATE TABLE doctors (
         REFERENCES specialties (id) ON DELETE RESTRICT
 );
 
--- Table: Patients
+
 CREATE TABLE patients (
     id SERIAL PRIMARY KEY,
     first_name VARCHAR(100) NOT NULL,
@@ -135,14 +142,14 @@ CREATE TABLE patients (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Table: Appointment Statuses
+
 CREATE TABLE appointment_statuses (
     id SERIAL PRIMARY KEY,
     code VARCHAR(20) NOT NULL UNIQUE,
     description VARCHAR(100)
 );
 
--- Table: Appointments
+
 CREATE TABLE appointments (
     id SERIAL PRIMARY KEY,
     patient_id INT NOT NULL,
@@ -160,7 +167,7 @@ CREATE TABLE appointments (
         REFERENCES appointment_statuses (id) ON DELETE RESTRICT
 );
 
--- Table: Medical Notes (1:1 with Appointments)
+
 CREATE TABLE medical_notes (
     id SERIAL PRIMARY KEY,
     appointment_id INT NOT NULL UNIQUE,
@@ -172,11 +179,10 @@ CREATE TABLE medical_notes (
         REFERENCES appointments (id) ON DELETE CASCADE
 );
 
+
 -- ============================================================================
 -- VECTOR TABLES (RAG)
 -- ============================================================================
-
--- Generic vector documents table for RAG
 CREATE TABLE vector_documents (
     id SERIAL PRIMARY KEY,
     reference_type VARCHAR(50) NOT NULL,
@@ -187,12 +193,13 @@ CREATE TABLE vector_documents (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+
 -- ============================================================================
 -- SEED DATA
 -- ============================================================================
-
 INSERT INTO roles (id, name, created_by_user_id)
 VALUES ('00000000-0000-0000-0000-000000000001', 'SYSTEM_ROLE', NULL);
+
 
 INSERT INTO users (id, email, password, full_name, address, phone, phone2, is_active, role_id, created_by_user_id)
 VALUES (
@@ -208,30 +215,32 @@ VALUES (
     NULL
 );
 
+
 UPDATE users SET created_by_user_id = 'ffffffff-ffff-ffff-ffff-ffffffffffff' WHERE id = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
 UPDATE roles SET created_by_user_id = 'ffffffff-ffff-ffff-ffff-ffffffffffff' WHERE id = '00000000-0000-0000-0000-000000000001';
+
 
 INSERT INTO roles (id, name, created_by_user_id)
 VALUES ('00000000-0000-0000-0000-000000000002', 'SUPER_ADMIN', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
 
+
 -- ============================================================================
 -- PERFORMANCE INDEXES
 -- ============================================================================
-
 CREATE INDEX idx_vector_documents_embedding
 ON vector_documents
 USING hnsw (embedding vector_cosine_ops);
+
 
 CREATE INDEX idx_appointments_patient ON appointments(patient_id);
 CREATE INDEX idx_appointments_doctor ON appointments(doctor_id);
 CREATE INDEX idx_appointments_start ON appointments(start_datetime);
 CREATE INDEX idx_doctors_specialty ON doctors(specialty_id);
 
+
 -- ============================================================================
 -- ADDITIONAL TABLES (WAITLIST, BRANCHES)
 -- ============================================================================
-
--- Table: Waitlist
 CREATE TABLE waitlist (
     id SERIAL PRIMARY KEY,
     patient_id INT NOT NULL,
@@ -247,10 +256,11 @@ CREATE TABLE waitlist (
         REFERENCES doctors (id) ON DELETE CASCADE
 );
 
+
 CREATE INDEX idx_waitlist_doctor ON waitlist(doctor_id);
 CREATE INDEX idx_waitlist_status ON waitlist(status);
 
--- Table: Branches
+
 CREATE TABLE branches (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -263,8 +273,10 @@ CREATE TABLE branches (
     deleted_at TIMESTAMP WITH TIME ZONE
 );
 
+
 ALTER TABLE doctors ADD COLUMN branch_id INT;
 ALTER TABLE doctors ADD CONSTRAINT fk_doctors_branch
     FOREIGN KEY (branch_id) REFERENCES branches (id) ON DELETE SET NULL;
+
 
 CREATE INDEX idx_doctors_branch ON doctors(branch_id);
