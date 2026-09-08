@@ -4,6 +4,7 @@ from api.endpoints import (
     doctors,
     integrations,
     login,
+    medasist,
     notifications,
     patients,
     premium,
@@ -50,6 +51,9 @@ app.include_router(
 )
 app.include_router(appointments.router)
 app.include_router(rag.router)
+
+# Medasist IA
+app.include_router(medasist.router)
 
 # New endpoints
 app.include_router(notifications.router)

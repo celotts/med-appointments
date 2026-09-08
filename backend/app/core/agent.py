@@ -12,7 +12,7 @@ from langchain_ollama import ChatOllama
 from sqlalchemy import text
 
 # Context variable for current language
-_current_language: ContextVar[str] = ContextVar('current_language', default='en')
+_current_language: ContextVar[str] = ContextVar("current_language", default="en")
 
 
 def get_current_language() -> str:
@@ -28,6 +28,7 @@ def set_current_language(lang: str) -> None:
 def t(key: str, **kwargs) -> str:
     """Shorthand for get_translation with current language."""
     return get_translation(key, get_current_language(), **kwargs)
+
 
 # Prompt injection patterns (case-insensitive)
 _INJECTION_PATTERNS = [
@@ -146,7 +147,9 @@ def _get_llm() -> ChatOllama:
 
 
 @tool
-async def buscar_en_documentos(query: str = "", reference_type: str | None = None) -> str:
+async def buscar_en_documentos(
+    query: str = "", reference_type: str | None = None
+) -> str:
     """Busca documentos relevantes en la base de datos vectorial (notas médicas, documentos clínicos).
 
     Args:
@@ -444,7 +447,9 @@ async def ejecutar_reagendamiento(
                 end_datetime=end,
             )
             try:
-                appointment = await crud_appointment.reschedule_appointment(db, db_appointment, update)
+                appointment = await crud_appointment.reschedule_appointment(
+                    db, db_appointment, update
+                )
             except ValueError as exc:
                 return f"Could not reschedule: {exc}"
             return (
@@ -481,7 +486,10 @@ async def cancelar_cita(appointment_id: int, confirmado: bool = False) -> str:
         async with async_session() as db:
             import core.base  # noqa: F401  (registers all models/mappers)
             from core import crud_appointment
-            from schemas.appointment import AppointmentStatusUpdate, AppointmentStatusCode
+            from schemas.appointment import (
+                AppointmentStatusCode,
+                AppointmentStatusUpdate,
+            )
 
             db_appointment = await crud_appointment.get_appointment(db, appointment_id)
             if not db_appointment:
@@ -489,7 +497,9 @@ async def cancelar_cita(appointment_id: int, confirmado: bool = False) -> str:
 
             try:
                 appointment = await crud_appointment.change_status(
-                    db, db_appointment, AppointmentStatusUpdate(status=AppointmentStatusCode.CANCELLED)
+                    db,
+                    db_appointment,
+                    AppointmentStatusUpdate(status=AppointmentStatusCode.CANCELLED),
                 )
             except ValueError as exc:
                 return f"Could not cancel: {exc}"
@@ -639,7 +649,6 @@ async def analizar_carga_medico(doctor_id: int, days: int = 7) -> str:
         doctor_id: ID del médico.
         days: Número de días a analizar (default 7).
     """
-    from datetime import datetime, timedelta
 
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -668,9 +677,7 @@ async def analizar_carga_medico(doctor_id: int, days: int = 7) -> str:
 
         # Get doctor info
         result_med = await db.execute(
-            text(
-                "SELECT first_name, last_name FROM doctors WHERE id = :id"
-            ),
+            text("SELECT first_name, last_name FROM doctors WHERE id = :id"),
             {"id": doctor_id},
         )
         medico = result_med.mappings().first()
@@ -758,7 +765,10 @@ async def detectar_conflictos(fecha_inicio: str, fecha_fin: str) -> str:
         for i in range(len(appointments)):
             for j in range(i + 1, len(appointments)):
                 c1, c2 = appointments[i], appointments[j]
-                if c1["start_datetime"] < c2["end_datetime"] and c2["start_datetime"] < c1["end_datetime"]:
+                if (
+                    c1["start_datetime"] < c2["end_datetime"]
+                    and c2["start_datetime"] < c1["end_datetime"]
+                ):
                     conflictos.append(
                         {
                             "doctor": medico,
@@ -831,7 +841,15 @@ async def analizar_patrones_paciente(patient_name: str = "") -> str:
         return f"No appointments found for '{patient_name}'."
 
     # Analyze patterns
-    day_of_week_map = {0: "Dom", 1: "Lun", 2: "Mar", 3: "Mié", 4: "Jue", 5: "Vie", 6: "Sáb"}
+    day_of_week_map = {
+        0: "Dom",
+        1: "Lun",
+        2: "Mar",
+        3: "Mié",
+        4: "Jue",
+        5: "Vie",
+        6: "Sáb",
+    }
     dia_counts = {}
     hora_counts = {}
     total = len(appointments)
@@ -842,7 +860,9 @@ async def analizar_patrones_paciente(patient_name: str = "") -> str:
         dia = day_of_week_map.get(c["day_of_week"], "?")
         dia_counts[dia] = dia_counts.get(dia, 0) + 1
         hora = c["hora"]
-        hora_counts[f"{int(hora):02d}:00"] = hora_counts.get(f"{int(hora):02d}:00", 0) + 1
+        hora_counts[f"{int(hora):02d}:00"] = (
+            hora_counts.get(f"{int(hora):02d}:00", 0) + 1
+        )
 
     dia_preferido = max(dia_counts, key=dia_counts.get) if dia_counts else "N/A"
     hora_preferida = max(hora_counts, key=hora_counts.get) if hora_counts else "N/A"
@@ -855,8 +875,12 @@ async def analizar_patrones_paciente(patient_name: str = "") -> str:
             "most_frequent_day": dia_preferido,
             "preferred_hours": hora_counts,
             "most_frequent_hour": hora_preferida,
-            "cancellation_rate": f"{(canceladas/total*100):.1f}%" if total > 0 else "0%",
-            "tasa_reagendamiento": f"{(reagendadas/total*100):.1f}%" if total > 0 else "0%",
+            "cancellation_rate": f"{(canceladas / total * 100):.1f}%"
+            if total > 0
+            else "0%",
+            "tasa_reagendamiento": f"{(reagendadas / total * 100):.1f}%"
+            if total > 0
+            else "0%",
             "recommendation": f"Para mayor asistencia, programar los {dia_preferido} a las {hora_preferida}.",
         },
         ensure_ascii=False,
@@ -885,7 +909,6 @@ async def crear_cita_por_lenguaje(
         patient_id: ID del paciente (opcional si se menciona nombre).
         doctor_id: ID del médico (opcional si se menciona nombre).
     """
-    from datetime import datetime, timedelta
 
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -1038,38 +1061,55 @@ async def reagendamiento_inteligente(appointment_id: int) -> str:
     await engine.dispose()
 
     # Generate recommendations
-    day_of_week_map = {0: "Dom", 1: "Lun", 2: "Mar", 3: "Mié", 4: "Jue", 5: "Vie", 6: "Sáb"}
+    day_of_week_map = {
+        0: "Dom",
+        1: "Lun",
+        2: "Mar",
+        3: "Mié",
+        4: "Jue",
+        5: "Vie",
+        6: "Sáb",
+    }
     recomendaciones = []
 
     if patrones:
         mejor_patron = patrones[0]
-        recomendaciones.append({
-            "tipo": "por_patron",
-            "dia": day_of_week_map.get(int(mejor_patron["day_of_week"]), "?"),
-            "hora": f"{int(mejor_patron['hora']):02d}:00",
-            "confianza": "alta",
-            "razon": f"El paciente tiene {mejor_patron['frecuencia']} appointments en este horario.",
-        })
+        recomendaciones.append(
+            {
+                "tipo": "por_patron",
+                "dia": day_of_week_map.get(int(mejor_patron["day_of_week"]), "?"),
+                "hora": f"{int(mejor_patron['hora']):02d}:00",
+                "confianza": "alta",
+                "razon": f"El paciente tiene {mejor_patron['frecuencia']} appointments en este horario.",
+            }
+        )
 
     # Find free slots in next 7 days
     date_obj = datetime.now().date()
     for day_offset in range(7):
         check_date = date_obj + timedelta(days=day_offset)
         for hour in [9, 10, 11, 14, 15, 16, 17]:
-            slot_start = datetime.combine(check_date, datetime.min.time().replace(hour=hour))
+            slot_start = datetime.combine(
+                check_date, datetime.min.time().replace(hour=hour)
+            )
             slot_end = slot_start + timedelta(minutes=30)
             is_free = True
             for occ in ocupadas:
-                if slot_start < occ["end_datetime"] and slot_end > occ["start_datetime"]:
+                if (
+                    slot_start < occ["end_datetime"]
+                    and slot_end > occ["start_datetime"]
+                ):
                     is_free = False
                     break
             if is_free:
-                recomendaciones.append({
-                    "tipo": "disponible",
-                    "date": slot_start.strftime("%Y-%m-%d"),
-                    "hora": slot_start.strftime("%H:%M"),
-                    "suggestion": slot_start.strftime("%Y-%m-%dT%H:%M:%S"),
-                })
+                recomendaciones.append(
+                    {
+                        "tipo": "disponible",
+                        "date": slot_start.strftime("%Y-%m-%d"),
+                        "hora": slot_start.strftime("%H:%M"),
+                        "suggestion": slot_start.strftime("%Y-%m-%dT%H:%M:%S"),
+                    }
+                )
                 if len(recomendaciones) >= 5:
                     break
         if len(recomendaciones) >= 5:
@@ -1247,10 +1287,6 @@ async def predecir_no_show(patient_id: int) -> str:
     tasa_asistencia = completadas / total if total > 0 else 0
 
     # Adjust by day of week (weekends have higher no-show rates)
-    dia_prefiere = max(
-        set(h["day_of_week"] for h in historial),
-        key=lambda d: sum(1 for h in historial if h["day_of_week"] == d),
-    )
 
     # Risk factors
     factores_riesgo = []
@@ -1260,7 +1296,9 @@ async def predecir_no_show(patient_id: int) -> str:
         factores_riesgo.append("Baja tasa de asistencia histórica")
 
     # Final probability (simple heuristic)
-    probabilidad = min(0.95, tasa_cancelacion * 0.7 + (0.1 if len(factores_riesgo) > 1 else 0))
+    probabilidad = min(
+        0.95, tasa_cancelacion * 0.7 + (0.1 if len(factores_riesgo) > 1 else 0)
+    )
 
     nivel_riesgo = "bajo"
     if probabilidad > 0.6:
@@ -1273,13 +1311,19 @@ async def predecir_no_show(patient_id: int) -> str:
             "patient_id": patient_id,
             "patient": f"{paciente['first_name']} {paciente['last_name']}",
             "total_appointments": total,
-            "cancellation_rate": f"{(tasa_cancelacion*100):.1f}%",
-            "attendance_rate": f"{(tasa_asistencia*100):.1f}%",
-            "no_show_probability": f"{(probabilidad*100):.1f}%",
+            "cancellation_rate": f"{(tasa_cancelacion * 100):.1f}%",
+            "attendance_rate": f"{(tasa_asistencia * 100):.1f}%",
+            "no_show_probability": f"{(probabilidad * 100):.1f}%",
             "risk_level": nivel_riesgo,
-            "risk_factors": factores_riesgo if factores_riesgo else ["Ninguno identificado"],
-            "recommendation": "Enviar recordatorio 24h antes" if nivel_riesgo == "medio" else (
-                "Considerar confirmación telefónica y recordatorio SMS" if nivel_riesgo == "alto" else "Sin acciones adicionales requeridas"
+            "risk_factors": factores_riesgo
+            if factores_riesgo
+            else ["Ninguno identificado"],
+            "recommendation": "Enviar recordatorio 24h antes"
+            if nivel_riesgo == "medio"
+            else (
+                "Considerar confirmación telefónica y recordatorio SMS"
+                if nivel_riesgo == "alto"
+                else "Sin acciones adicionales requeridas"
             ),
         },
         ensure_ascii=False,
@@ -1429,8 +1473,12 @@ async def encontrar_horario_compartido(
     all_slots = []
     for hour in range(8, 20):
         for minute in [0, 30]:
-            slot_start = datetime.combine(date_obj, datetime.min.time().replace(hour=hour, minute=minute))
-            if slot_start + timedelta(minutes=duracion_min) <= datetime.combine(date_obj, datetime.min.time().replace(hour=20)):
+            slot_start = datetime.combine(
+                date_obj, datetime.min.time().replace(hour=hour, minute=minute)
+            )
+            if slot_start + timedelta(minutes=duracion_min) <= datetime.combine(
+                date_obj, datetime.min.time().replace(hour=20)
+            ):
                 all_slots.append(slot_start)
 
     # Find slots where ALL doctors are free
@@ -1438,7 +1486,7 @@ async def encontrar_horario_compartido(
     for slot in all_slots:
         slot_end = slot + timedelta(minutes=duracion_min)
         todos_libres = True
-        for med_id, info in disponibilidad.items():
+        for _med_id, info in disponibilidad.items():
             for occ in info["ocupadas"]:
                 if slot < occ["end_datetime"] and slot_end > occ["start_datetime"]:
                     todos_libres = False
@@ -1450,7 +1498,11 @@ async def encontrar_horario_compartido(
 
     return json.dumps(
         {
-            "doctors": [disponibilidad[mid]["name"] for mid in doctor_ids if mid in disponibilidad],
+            "doctors": [
+                disponibilidad[mid]["name"]
+                for mid in doctor_ids
+                if mid in disponibilidad
+            ],
             "date": fecha,
             "duration_min": duracion_min,
             "shared_schedules": [
@@ -1481,9 +1533,15 @@ async def triagar_por_sintomas(symptom_description: str) -> str:
     reglas = {
         "urgente": {
             "keywords": [
-                "dolor pecho", "dificultad para respirar", "sangrado abundante",
-                "pérdida de conocimiento", "convulsiones", "alergia severa",
-                "dolor abdominal intenso", "fiebre alta", "traumatismo",
+                "dolor pecho",
+                "dificultad para respirar",
+                "sangrado abundante",
+                "pérdida de conocimiento",
+                "convulsiones",
+                "alergia severa",
+                "dolor abdominal intenso",
+                "fiebre alta",
+                "traumatismo",
             ],
             "level": "URGENTE",
             "specialty": "Urgencias",
@@ -1491,9 +1549,15 @@ async def triagar_por_sintomas(symptom_description: str) -> str:
         },
         "alta": {
             "keywords": [
-                "dolor fuerte", "fiebre", "inflamación", "mareo",
-                "vómito", "diarrea persistente", "dolor articular",
-                "erupción cutánea", "infección",
+                "dolor fuerte",
+                "fiebre",
+                "inflamación",
+                "mareo",
+                "vómito",
+                "diarrea persistente",
+                "dolor articular",
+                "erupción cutánea",
+                "infección",
             ],
             "level": "ALTA",
             "specialty": "Medicina General",
@@ -1501,9 +1565,15 @@ async def triagar_por_sintomas(symptom_description: str) -> str:
         },
         "media": {
             "keywords": [
-                "dolor leve", "cansancio", "tos", "resfriado",
-                "dolor de cabeza", "insomnio", "ansiedad leve",
-                "dolor de espalda", "malestar general",
+                "dolor leve",
+                "cansancio",
+                "tos",
+                "resfriado",
+                "dolor de cabeza",
+                "insomnio",
+                "ansiedad leve",
+                "dolor de espalda",
+                "malestar general",
             ],
             "level": "MEDIA",
             "specialty": "Medicina General",
@@ -1511,8 +1581,13 @@ async def triagar_por_sintomas(symptom_description: str) -> str:
         },
         "baja": {
             "keywords": [
-                "consulta", "receta", "certificado", "control",
-                "seguimiento", "prevención", "examen",
+                "consulta",
+                "receta",
+                "certificado",
+                "control",
+                "seguimiento",
+                "prevención",
+                "examen",
             ],
             "level": "BAJA",
             "specialty": "Medicina General",
@@ -1523,7 +1598,7 @@ async def triagar_por_sintomas(symptom_description: str) -> str:
     sintomas_lower = symptom_description.lower()
     resultado = None
 
-    for nivel, regla in reglas.items():
+    for _nivel, regla in reglas.items():
         for keyword in regla["keywords"]:
             if keyword in sintomas_lower:
                 resultado = regla
@@ -1558,8 +1633,8 @@ async def triagar_por_sintomas(symptom_description: str) -> str:
             },
             "specialties_disponibles": specialties,
             "message": f"Nivel: {resultado.get('nivel', 'MEDIA')}. "
-                       f"Especialidad: {resultado.get('especialidad', 'Medicina General')}. "
-                       f"Tiempo recomendado: {resultado.get('tiempo', '3-5 días')}.",
+            f"Especialidad: {resultado.get('especialidad', 'Medicina General')}. "
+            f"Tiempo recomendado: {resultado.get('tiempo', '3-5 días')}.",
             "nota": "Este triaje es orientativo. Un profesional debe confirmar la evaluación.",
         },
         ensure_ascii=False,
@@ -1615,10 +1690,10 @@ async def cancelar_citas_masivo(
             return f"No active appointments for doctor {doctor_id} on {fecha}."
 
         # Get cancel state
-        result_estado = await db.execute(
+        result_state = await db.execute(
             text("SELECT id FROM appointment_statuses WHERE codigo = 'CANCELADA'")
         )
-        estado_cancel = result_estado.first()
+        cancel_state = result_state.first()
 
         # Cancel all appointments
         canceladas = []
@@ -1630,13 +1705,15 @@ async def cancelar_citas_masivo(
                     WHERE id = :appointment_id
                     """
                 ),
-                {"status_id": estado_cancel[0], "appointment_id": cita["id"]},
+                {"status_id": cancel_state[0], "appointment_id": cita["id"]},
             )
-            canceladas.append({
-                "id": cita["id"],
-                "patient": cita["patient"],
-                "hora": str(cita["start_datetime"]),
-            })
+            canceladas.append(
+                {
+                    "id": cita["id"],
+                    "patient": cita["patient"],
+                    "hora": str(cita["start_datetime"]),
+                }
+            )
 
         # Check waitlist
         result_espera = await db.execute(
@@ -1684,7 +1761,7 @@ async def replanificar_citas(
         target_date: Fecha destino (YYYY-MM-DD).
         confirmado: Debe ser True para ejecutar.
     """
-    from datetime import datetime, timedelta
+    from datetime import datetime
 
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -1769,7 +1846,10 @@ async def replanificar_citas(
         while nueva_fin <= hora_fin_jornada:
             conflicto = False
             for occ in ocupadas_dest:
-                if nueva_hora < occ["end_datetime"] and nueva_fin > occ["start_datetime"]:
+                if (
+                    nueva_hora < occ["end_datetime"]
+                    and nueva_fin > occ["start_datetime"]
+                ):
                     conflicto = True
                     nueva_hora = occ["end_datetime"]
                     nueva_fin = nueva_hora + duracion
@@ -1792,19 +1872,27 @@ async def replanificar_citas(
                         WHERE id = :appointment_id
                         """
                     ),
-                    {"start": nueva_hora, "end": nueva_fin, "appointment_id": cita["id"]},
+                    {
+                        "start": nueva_hora,
+                        "end": nueva_fin,
+                        "appointment_id": cita["id"],
+                    },
                 )
                 await db.commit()
             await engine2.dispose()
 
-            movidas.append({
-                "id": cita["id"],
-                "patient": cita["patient"],
-                "hora_original": str(cita["start_datetime"]),
-                "nueva_hora": str(nueva_hora),
-            })
+            movidas.append(
+                {
+                    "id": cita["id"],
+                    "patient": cita["patient"],
+                    "hora_original": str(cita["start_datetime"]),
+                    "nueva_hora": str(nueva_hora),
+                }
+            )
             hora_actual = nueva_fin
-            ocupadas_dest.append({"start_datetime": nueva_hora, "end_datetime": nueva_fin})
+            ocupadas_dest.append(
+                {"start_datetime": nueva_hora, "end_datetime": nueva_fin}
+            )
 
     return json.dumps(
         {
@@ -1884,11 +1972,16 @@ async def notificar_lista_espera(doctor_id: int, fecha: str = "") -> str:
     for day_offset in range(7):
         check_date = date_obj + timedelta(days=day_offset)
         for hour in [9, 10, 11, 14, 15, 16, 17]:
-            slot_start = datetime.combine(check_date, datetime.min.time().replace(hour=hour))
+            slot_start = datetime.combine(
+                check_date, datetime.min.time().replace(hour=hour)
+            )
             slot_end = slot_start + timedelta(minutes=30)
             is_free = True
             for occ in ocupadas:
-                if slot_start < occ["end_datetime"] and slot_end > occ["start_datetime"]:
+                if (
+                    slot_start < occ["end_datetime"]
+                    and slot_end > occ["start_datetime"]
+                ):
                     is_free = False
                     break
             if is_free:
@@ -1896,13 +1989,17 @@ async def notificar_lista_espera(doctor_id: int, fecha: str = "") -> str:
 
     # Match waitlist with available slots
     notificados = []
-    for pend in pendientes[:len(slots_libres)]:
-        notificados.append({
-            "patient_id": pend["patient_id"],
-            "patient": pend["patient"],
-            "slot_offered": slots_libres[len(notificados)].strftime("%Y-%m-%dT%H:%M:%S"),
-            "original_reason": pend["reason"],
-        })
+    for pend in pendientes[: len(slots_libres)]:
+        notificados.append(
+            {
+                "patient_id": pend["patient_id"],
+                "patient": pend["patient"],
+                "slot_offered": slots_libres[len(notificados)].strftime(
+                    "%Y-%m-%dT%H:%M:%S"
+                ),
+                "original_reason": pend["reason"],
+            }
+        )
 
     return json.dumps(
         {
@@ -1968,10 +2065,10 @@ async def protocolo_emergencia(
         appointments = result.mappings().all()
 
         # Cancel all
-        result_estado = await db.execute(
+        result_state = await db.execute(
             text("SELECT id FROM appointment_statuses WHERE codigo = 'CANCELADA'")
         )
-        estado_cancel = result_estado.first()
+        cancel_state = result_state.first()
 
         canceladas = []
         for cita in appointments:
@@ -1979,13 +2076,15 @@ async def protocolo_emergencia(
                 text(
                     "UPDATE appointments SET status_id = :status_id WHERE id = :appointment_id"
                 ),
-                {"status_id": estado_cancel[0], "appointment_id": cita["id"]},
+                {"status_id": cancel_state[0], "appointment_id": cita["id"]},
             )
-            canceladas.append({
-                "id": cita["id"],
-                "patient": cita["patient"],
-                "hora": str(cita["start_datetime"]),
-            })
+            canceladas.append(
+                {
+                    "id": cita["id"],
+                    "patient": cita["patient"],
+                    "hora": str(cita["start_datetime"]),
+                }
+            )
 
         await db.commit()
     await engine.dispose()
@@ -2025,7 +2124,6 @@ async def optimizar_agenda(doctor_id: int, days: int = 14) -> str:
         doctor_id: ID del médico.
         days: Días a analizar (default 14).
     """
-    from datetime import datetime, timedelta
 
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -2068,19 +2166,23 @@ async def optimizar_agenda(doctor_id: int, days: int = 14) -> str:
     # Recommendations
     recomendaciones = []
     if horas_vacias:
-        recomendaciones.append({
-            "tipo": "compactar",
-            "description": f"Horarios vacíos: {', '.join(horas_vacias[:5])}",
-            "action": "Mover appointments a estos horarios para maximizar espacio.",
-        })
+        recomendaciones.append(
+            {
+                "tipo": "compactar",
+                "description": f"Horarios vacíos: {', '.join(horas_vacias[:5])}",
+                "action": "Mover appointments a estos horarios para maximizar espacio.",
+            }
+        )
 
     hora_pico = max(horas_pico, key=horas_pico.get) if horas_pico else None
     if hora_pico and horas_pico[hora_pico] > 5:
-        recomendaciones.append({
-            "tipo": "distribuir",
-            "description": f"Hora pico: {hora_pico:02d}:00 con {horas_pico[hora_pico]} appointments",
-            "action": "Distribuir carga a horas menos ocupadas.",
-        })
+        recomendaciones.append(
+            {
+                "tipo": "distribuir",
+                "description": f"Hora pico: {hora_pico:02d}:00 con {horas_pico[hora_pico]} appointments",
+                "action": "Distribuir carga a horas menos ocupadas.",
+            }
+        )
 
     return json.dumps(
         {
@@ -2190,7 +2292,6 @@ async def predecir_demanda(days: int = 30) -> str:
     Args:
         days: Días a predecir (default 30).
     """
-    from datetime import datetime, timedelta
 
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -2237,7 +2338,15 @@ async def predecir_demanda(days: int = 30) -> str:
     await engine.dispose()
 
     # Analyze patterns
-    day_of_week_map = {0: "Dom", 1: "Lun", 2: "Mar", 3: "Mié", 4: "Jue", 5: "Vie", 6: "Sáb"}
+    day_of_week_map = {
+        0: "Dom",
+        1: "Lun",
+        2: "Mar",
+        3: "Mié",
+        4: "Jue",
+        5: "Vie",
+        6: "Sáb",
+    }
     demanda_por_dia = {}
     demanda_por_especialidad = {}
 
@@ -2245,12 +2354,20 @@ async def predecir_demanda(days: int = 30) -> str:
         dia = day_of_week_map.get(row["day_of_week"], "?")
         demanda_por_dia[dia] = demanda_por_dia.get(dia, 0) + row["total_appointments"]
         esp = row["specialty"]
-        demanda_por_especialidad[esp] = demanda_por_especialidad.get(esp, 0) + row["total_appointments"]
+        demanda_por_especialidad[esp] = (
+            demanda_por_especialidad.get(esp, 0) + row["total_appointments"]
+        )
 
     # Predictions
     promedio_diario = sum(demanda_por_dia.values()) / 7 if demanda_por_dia else 0
-    dia_pico = max(demanda_por_dia, key=demanda_por_dia.get) if demanda_por_dia else "N/A"
-    especialidad_top = max(demanda_por_especialidad, key=demanda_por_especialidad.get) if demanda_por_especialidad else "N/A"
+    dia_pico = (
+        max(demanda_por_dia, key=demanda_por_dia.get) if demanda_por_dia else "N/A"
+    )
+    especialidad_top = (
+        max(demanda_por_especialidad, key=demanda_por_especialidad.get)
+        if demanda_por_especialidad
+        else "N/A"
+    )
 
     return json.dumps(
         {
@@ -2361,35 +2478,49 @@ async def matching_paciente_medico(patient_id: int) -> str:
     # Calculate compatibility scores
     recomendaciones = []
     for med in doctors_historial:
-        tasa_exito = (med["completadas"] or 0) / med["appointments_con_paciente"] if med["appointments_con_paciente"] > 0 else 0
+        tasa_exito = (
+            (med["completadas"] or 0) / med["appointments_con_paciente"]
+            if med["appointments_con_paciente"] > 0
+            else 0
+        )
         score = tasa_exito * 100
-        recomendaciones.append({
-            "doctor_id": med["id"],
-            "name": med["name"],
-            "specialty": med["specialty"],
-            "appointments_juntos": med["appointments_con_paciente"],
-            "success_rate": f"{(tasa_exito*100):.1f}%",
-            "compatibility_score": round(score, 1),
-            "tipo": "historial",
-        })
+        recomendaciones.append(
+            {
+                "doctor_id": med["id"],
+                "name": med["name"],
+                "specialty": med["specialty"],
+                "appointments_juntos": med["appointments_con_paciente"],
+                "success_rate": f"{(tasa_exito * 100):.1f}%",
+                "compatibility_score": round(score, 1),
+                "tipo": "historial",
+            }
+        )
 
     # Add top doctors if no history
     if not recomendaciones:
         for med in doctors_top:
-            tasa = (med["completadas"] or 0) / med["total_appointments"] if med["total_appointments"] > 0 else 0
-            recomendaciones.append({
-                "doctor_id": med["id"],
-                "name": med["name"],
-                "specialty": med["specialty"],
-                "compatibility_score": round(tasa * 100, 1),
-                "tipo": "recomendado",
-            })
+            tasa = (
+                (med["completadas"] or 0) / med["total_appointments"]
+                if med["total_appointments"] > 0
+                else 0
+            )
+            recomendaciones.append(
+                {
+                    "doctor_id": med["id"],
+                    "name": med["name"],
+                    "specialty": med["specialty"],
+                    "compatibility_score": round(tasa * 100, 1),
+                    "tipo": "recomendado",
+                }
+            )
 
     return json.dumps(
         {
             "patient": paciente["name"],
             "total_appointments_historial": paciente["total_appointments"],
-            "mejores_doctors": sorted(recomendaciones, key=lambda x: x["compatibility_score"], reverse=True)[:5],
+            "mejores_doctors": sorted(
+                recomendaciones, key=lambda x: x["compatibility_score"], reverse=True
+            )[:5],
             "message": "Médicos ordenados por compatibilidad con el paciente.",
         },
         ensure_ascii=False,
@@ -2490,7 +2621,6 @@ async def optimizar_ingresos(doctor_id: int, days: int = 30) -> str:
         doctor_id: ID del médico.
         days: Días a analizar (default 30).
     """
-    from datetime import datetime, timedelta
 
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -2529,36 +2659,48 @@ async def optimizar_ingresos(doctor_id: int, days: int = 30) -> str:
             horas_facturacion[hora] = horas_facturacion.get(hora, 0) + row["total"]
             total_completadas += row["total"]
         elif row["status"] == "CANCELADA":
-            cancelaciones_por_hora[hora] = cancelaciones_por_hora.get(hora, 0) + row["total"]
+            cancelaciones_por_hora[hora] = (
+                cancelaciones_por_hora.get(hora, 0) + row["total"]
+            )
             total_canceladas += row["total"]
 
     # Revenue optimization suggestions
     sugerencias = []
-    hora_pico = max(horas_facturacion, key=horas_facturacion.get) if horas_facturacion else None
+    hora_pico = (
+        max(horas_facturacion, key=horas_facturacion.get) if horas_facturacion else None
+    )
 
     if hora_pico:
-        sugerencias.append({
-            "tipo": "mantener",
-            "description": f"Hora pico de productividad: {hora_pico:02d}:00",
-            "impacto": "Alto",
-        })
+        sugerencias.append(
+            {
+                "tipo": "mantener",
+                "description": f"Hora pico de productividad: {hora_pico:02d}:00",
+                "impacto": "Alto",
+            }
+        )
 
-    horas_canceladas = sorted(cancelaciones_por_hora.items(), key=lambda x: x[1], reverse=True)
+    horas_canceladas = sorted(
+        cancelaciones_por_hora.items(), key=lambda x: x[1], reverse=True
+    )
     if horas_canceladas:
-        sugerencias.append({
-            "tipo": "rellenar",
-            "description": f"Horas con más cancelaciones: {horas_canceladas[0][0]:02d}:00 ({horas_canceladas[0][1]} cancelaciones)",
-            "impacto": "Medio",
-            "action": "Ofrecer descuento o prioridad para rellenar estos slots",
-        })
+        sugerencias.append(
+            {
+                "tipo": "rellenar",
+                "description": f"Horas con más cancelaciones: {horas_canceladas[0][0]:02d}:00 ({horas_canceladas[0][1]} cancelaciones)",
+                "impacto": "Medio",
+                "action": "Ofrecer descuento o prioridad para rellenar estos slots",
+            }
+        )
 
     if total_canceladas > total_completadas * 0.2:
-        sugerencias.append({
-            "tipo": "reducir_cancelaciones",
-            "description": f"Tasa de cancelación: {(total_canceladas/(total_completadas+total_canceladas)*100):.1f}%",
-            "impacto": "Alto",
-            "action": "Implementar recordatorios 24h antes y confirmación telefónica",
-        })
+        sugerencias.append(
+            {
+                "tipo": "reducir_cancelaciones",
+                "description": f"Tasa de cancelación: {(total_canceladas / (total_completadas + total_canceladas) * 100):.1f}%",
+                "impacto": "Alto",
+                "action": "Implementar recordatorios 24h antes y confirmación telefónica",
+            }
+        )
 
     return json.dumps(
         {
@@ -2566,7 +2708,9 @@ async def optimizar_ingresos(doctor_id: int, days: int = 30) -> str:
             "period": f"Últimos {days} días",
             "appointments_completadas": total_completadas,
             "appointments_canceladas": total_canceladas,
-            "cancellation_rate": f"{(total_canceladas/(total_completadas+total_canceladas)*100):.1f}%" if (total_completadas+total_canceladas) > 0 else "0%",
+            "cancellation_rate": f"{(total_canceladas / (total_completadas + total_canceladas) * 100):.1f}%"
+            if (total_completadas + total_canceladas) > 0
+            else "0%",
             "most_productive_hours": horas_facturacion,
             "sugerencias": sugerencias,
             "improvement_potential": f"Reducir cancelaciones podría aumentar ingresos ~{(total_canceladas * 0.3):.0f} appointments/mes",
@@ -2641,7 +2785,12 @@ async def score_satisfaccion(patient_id: int) -> str:
     penalty_cancelacion = (canceladas / total) * 30 if total > 0 else 0
     penalty_reagendamiento = (reagendadas / total) * 10 if total > 0 else 0
 
-    score = max(0, min(100, (tasa_asistencia * 100) - penalty_cancelacion - penalty_reagendamiento))
+    score = max(
+        0,
+        min(
+            100, (tasa_asistencia * 100) - penalty_cancelacion - penalty_reagendamiento
+        ),
+    )
 
     # Satisfaction level
     if score >= 80:
@@ -2665,7 +2814,7 @@ async def score_satisfaccion(patient_id: int) -> str:
             "completadas": completadas,
             "canceladas": canceladas,
             "reagendadas": reagendadas,
-            "attendance_rate": f"{(tasa_asistencia*100):.1f}%",
+            "attendance_rate": f"{(tasa_asistencia * 100):.1f}%",
             "satisfaction_score": round(score, 1),
             "level": nivel,
             "recommendation": recomendacion,
@@ -2780,11 +2929,18 @@ async def resumen_clinico_paciente(patient_id: int) -> str:
     # Generate alerts
     if diagnosticos:
         ultimo_diag = diagnosticos[0]["diagnosis"] or ""
-        if any(word in ultimo_diag.lower() for word in ["crónico", "diabetes", "hipertensión"]):
-            resumen["alertas"].append("Paciente con condición crónica - requiere seguimiento regular")
+        if any(
+            word in ultimo_diag.lower()
+            for word in ["crónico", "diabetes", "hipertensión"]
+        ):
+            resumen["alertas"].append(
+                "Paciente con condición crónica - requiere seguimiento regular"
+            )
 
     if len(diagnosticos) > 2:
-        resumen["alertas"].append(f"Paciente con {len(diagnosticos)} consultas recientes - posible caso complejo")
+        resumen["alertas"].append(
+            f"Paciente con {len(diagnosticos)} consultas recientes - posible caso complejo"
+        )
 
     return json.dumps(resumen, ensure_ascii=False, indent=2)
 
@@ -2853,34 +3009,47 @@ async def detectar_anomalias(days: int = 30) -> str:
         if med["total"] > 0:
             tasa = (med["canceladas"] or 0) / med["total"]
             if tasa > 0.4:
-                anomalias.append({
-                    "tipo": "alta_cancelacion",
-                    "severidad": "ALTA",
-                    "description": f"Dr. {med['medico']} tiene tasa de cancelación del {(tasa*100):.1f}%",
-                    "action": "Revisar motivos, considerar recordatorios o depósitos",
-                })
+                anomalias.append(
+                    {
+                        "tipo": "alta_cancelacion",
+                        "severidad": "ALTA",
+                        "description": f"Dr. {med['medico']} tiene tasa de cancelación del {(tasa * 100):.1f}%",
+                        "action": "Revisar motivos, considerar recordatorios o depósitos",
+                    }
+                )
             elif tasa > 0.25:
-                anomalias.append({
-                    "tipo": "cancelacion_moderada",
-                    "severidad": "MEDIA",
-                    "description": f"Dr. {med['medico']} tiene tasa de cancelación del {(tasa*100):.1f}%",
-                    "action": "Monitorear y ajustar política de cancelación",
-                })
+                anomalias.append(
+                    {
+                        "tipo": "cancelacion_moderada",
+                        "severidad": "MEDIA",
+                        "description": f"Dr. {med['medico']} tiene tasa de cancelación del {(tasa * 100):.1f}%",
+                        "action": "Monitorear y ajustar política de cancelación",
+                    }
+                )
 
     # Check for overbooking
     for ob in overbooking:
-        anomalias.append({
-            "tipo": "sobrecarga",
-            "severidad": "MEDIA",
-            "description": f"Médico {ob['doctor_id']} con {ob['appointments_dia']} appointments el {ob['dia']}",
-            "action": "Revisar capacidad y redistribuir si es necesario",
-        })
+        anomalias.append(
+            {
+                "tipo": "sobrecarga",
+                "severidad": "MEDIA",
+                "description": f"Médico {ob['doctor_id']} con {ob['appointments_dia']} appointments el {ob['dia']}",
+                "action": "Revisar capacidad y redistribuir si es necesario",
+            }
+        )
 
     return json.dumps(
         {
             "analysis_period": f"Últimos {days} días",
             "anomalies_found": len(anomalias),
-            "details": anomalias if anomalias else [{"tipo": "sin_anomalias", "message": "No significant anomalies detected."}],
+            "details": anomalias
+            if anomalias
+            else [
+                {
+                    "tipo": "sin_anomalias",
+                    "message": "No significant anomalies detected.",
+                }
+            ],
         },
         ensure_ascii=False,
         indent=2,
@@ -2900,7 +3069,6 @@ async def scheduling_adaptativo(doctor_id: int) -> str:
     Args:
         doctor_id: ID del médico.
     """
-    from datetime import datetime
 
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -2950,7 +3118,7 @@ async def scheduling_adaptativo(doctor_id: int) -> str:
         horas_analisis[f"{hora:02d}:00"] = {
             "duracion_promedio_min": round(duracion, 1),
             "appointments": total,
-            "tasa_completado": f"{(tasa_completado*100):.1f}%",
+            "tasa_completado": f"{(tasa_completado * 100):.1f}%",
         }
 
     # Generate adaptive recommendations
@@ -2962,12 +3130,14 @@ async def scheduling_adaptativo(doctor_id: int) -> str:
         hora_siguiente, datos_siguiente = horas_datos[i + 1]
 
         if datos_actual["duracion_promedio_min"] > 45:
-            recomendaciones.append({
-                "tipo": "ajustar_duracion",
-                "hora": hora_actual,
-                "description": f"Citas en {hora_actual} duran {datos_actual['duracion_promedio_min']} min (promedio)",
-                "action": f"Aumentar slot a {round(datos_actual['duracion_promedio_min'] + 5)} min",
-            })
+            recomendaciones.append(
+                {
+                    "tipo": "ajustar_duracion",
+                    "hora": hora_actual,
+                    "description": f"Citas en {hora_actual} duran {datos_actual['duracion_promedio_min']} min (promedio)",
+                    "action": f"Aumentar slot a {round(datos_actual['duracion_promedio_min'] + 5)} min",
+                }
+            )
 
     return json.dumps(
         {
@@ -3039,8 +3209,12 @@ async def resolver_conflicto_cirugia(
 
         # 2. Find affected appointments
         fecha_dt = datetime.strptime(fecha_cirugia, "%Y-%m-%d")
-        inicio_dt = fecha_dt.replace(hour=int(hora_inicio.split(":")[0]), minute=int(hora_inicio.split(":")[1]))
-        fin_dt = fecha_dt.replace(hour=int(hora_fin.split(":")[0]), minute=int(hora_fin.split(":")[1]))
+        inicio_dt = fecha_dt.replace(
+            hour=int(hora_inicio.split(":")[0]), minute=int(hora_inicio.split(":")[1])
+        )
+        fin_dt = fecha_dt.replace(
+            hour=int(hora_fin.split(":")[0]), minute=int(hora_fin.split(":")[1])
+        )
 
         result_appointments = await db.execute(
             text(
@@ -3100,38 +3274,42 @@ async def resolver_conflicto_cirugia(
         doctores_alternativos = result_alt.mappings().all()
 
         # 4. Get cancel state
-        result_estado = await db.execute(
+        result_state = await db.execute(
             text("SELECT id FROM appointment_statuses WHERE codigo = 'CANCELADA'")
         )
-        estado_cancel = result_estado.first()
+        _cancel_state = result_state.first()
     await engine.dispose()
 
     # Build response
     appointments_info = []
     for c in appointments_afectadas:
-        appointments_info.append({
-            "appointment_id": c["id"],
-            "patient": c["patient"],
-            "email": c["email"],
-            "phone": c["phone"],
-            "hora": str(c["start_datetime"]),
-            "reason": c["reason"][:100] if c["reason"] else "N/A",
-        })
+        appointments_info.append(
+            {
+                "appointment_id": c["id"],
+                "patient": c["patient"],
+                "email": c["email"],
+                "phone": c["phone"],
+                "hora": str(c["start_datetime"]),
+                "reason": c["reason"][:100] if c["reason"] else "N/A",
+            }
+        )
 
     alternativas = []
     for doc in doctores_alternativos:
-        alternativas.append({
-            "doctor_id": doc["id"],
-            "name": doc["name"],
-            "appointments_en_horario": doc["appointments_ocupadas"],
-        })
+        alternativas.append(
+            {
+                "doctor_id": doc["id"],
+                "name": doc["name"],
+                "appointments_en_horario": doc["appointments_ocupadas"],
+            }
+        )
 
     if not confirmado:
         return json.dumps(
             {
                 "action": "resolver_conflicto_cirugia",
                 "status": "PENDIENTE_CONFIRMACION",
-            "doctor": f"{medico['first_name']} {medico['last_name']}",
+                "doctor": f"{medico['first_name']} {medico['last_name']}",
                 "specialty": medico["specialty"],
                 "cirugia": {
                     "date": fecha_cirugia,
@@ -3202,15 +3380,20 @@ async def resolver_conflicto_cirugia(
                         WHERE id = :appointment_id
                         """
                     ),
-                    {"nuevo_medico": doctor_asignado["id"], "appointment_id": cita["id"]},
+                    {
+                        "nuevo_medico": doctor_asignado["id"],
+                        "appointment_id": cita["id"],
+                    },
                 )
-                resultados.append({
-                    "appointment_id": cita["id"],
-                    "patient": cita["patient"],
-                    "action": "REASIGNADA",
-                    "nuevo_medico": doctor_asignado["name"],
-                    "hora_mantenida": str(nueva_hora),
-                })
+                resultados.append(
+                    {
+                        "appointment_id": cita["id"],
+                        "patient": cita["patient"],
+                        "action": "REASIGNADA",
+                        "nuevo_medico": doctor_asignado["name"],
+                        "hora_mantenida": str(nueva_hora),
+                    }
+                )
             else:
                 # Cancel and add to waitlist
                 await db_update.execute(
@@ -3235,15 +3418,17 @@ async def resolver_conflicto_cirugia(
                         "patient_id": cita["patient_id"],
                         "doctor_id": doctor_id,
                         "date": (fecha_dt + timedelta(days=1)).strftime("%Y-%m-%d"),
-                        "reason": f"Cita cancelada por cirugía del médico original",
+                        "reason": "Cita cancelada por cirugía del médico original",
                     },
                 )
-                resultados.append({
-                    "appointment_id": cita["id"],
-                    "patient": cita["patient"],
-                    "action": "CANCELADA_LISTA_ESPERA",
-                    "razon": "Sin médico alternativo disponible",
-                })
+                resultados.append(
+                    {
+                        "appointment_id": cita["id"],
+                        "patient": cita["patient"],
+                        "action": "CANCELADA_LISTA_ESPERA",
+                        "razon": "Sin médico alternativo disponible",
+                    }
+                )
 
         await db_update.commit()
     await engine2.dispose()
@@ -3252,25 +3437,29 @@ async def resolver_conflicto_cirugia(
     notificaciones = []
     for r in resultados:
         if r["action"] == "REASIGNADA":
-            notificaciones.append({
-                "patient": r["patient"],
-                "message": (
-                    f"Estimado/a {r['paciente']}, su cita ha sido reasignada al "
-                    f"Dr./Dra. {r['nuevo_medico']} el {r.get('hora_mantenida', fecha_cirugia)}. "
-                    f"Disculpe las molestias."
-                ),
-                "canal": "SMS + Email",
-            })
+            notificaciones.append(
+                {
+                    "patient": r["patient"],
+                    "message": (
+                        f"Estimado/a {r['paciente']}, su cita ha sido reasignada al "
+                        f"Dr./Dra. {r['nuevo_medico']} el {r.get('hora_mantenida', fecha_cirugia)}. "
+                        f"Disculpe las molestias."
+                    ),
+                    "canal": "SMS + Email",
+                }
+            )
         else:
-            notificaciones.append({
-                "patient": r["patient"],
-                "message": (
-                    f"Estimado/a {r['paciente']}, lamentamos informarle que su cita del "
-                    f"{fecha_cirugia} ha sido cancelada por motivos médicos. "
-                    f"Ha sido agregado a nuestra lista de espera y le notificaremos pronto."
-                ),
-                "canal": "SMS + Email + Llamada",
-            })
+            notificaciones.append(
+                {
+                    "patient": r["patient"],
+                    "message": (
+                        f"Estimado/a {r['paciente']}, lamentamos informarle que su cita del "
+                        f"{fecha_cirugia} ha sido cancelada por motivos médicos. "
+                        f"Ha sido agregado a nuestra lista de espera y le notificaremos pronto."
+                    ),
+                    "canal": "SMS + Email + Llamada",
+                }
+            )
 
     return json.dumps(
         {
@@ -3280,7 +3469,9 @@ async def resolver_conflicto_cirugia(
             "cirugia": f"{fecha_cirugia} {hora_inicio}-{hora_fin}",
             "appointments_procesadas": len(resultados),
             "reassigned": sum(1 for r in resultados if r["action"] == "REASIGNADA"),
-            "cancelled_waitlist": sum(1 for r in resultados if "LISTA_ESPERA" in r["action"]),
+            "cancelled_waitlist": sum(
+                1 for r in resultados if "LISTA_ESPERA" in r["action"]
+            ),
             "resultados": resultados,
             "notifications_generated": notificaciones,
             "message": f"Conflict resolved: {len(resultados)} appointments processed.",
@@ -3310,9 +3501,20 @@ async def analisis_sentimiento(patient_text: str, patient_id: int | None = None)
     sentimentos = {
         "ansiedad": {
             "keywords": [
-                "ansioso", "ansiedad", "nervioso", "preocupado", "miedo",
-                "temeroso", "inquieto", "tenso", "estresado", "pánico",
-                "angustia", "desesperado", "agobiado", "aterrado",
+                "ansioso",
+                "ansiedad",
+                "nervioso",
+                "preocupado",
+                "miedo",
+                "temeroso",
+                "inquieto",
+                "tenso",
+                "estresado",
+                "pánico",
+                "angustia",
+                "desesperado",
+                "agobiado",
+                "aterrado",
             ],
             "level": "ALTO",
             "color": "🔴",
@@ -3320,8 +3522,16 @@ async def analisis_sentimiento(patient_text: str, patient_id: int | None = None)
         },
         "frustración": {
             "keywords": [
-                "frustrado", "frustración", "enojado", "molesto", "hartado",
-                "cansado", "harto", "rabia", "indignado", "furioso",
+                "frustrado",
+                "frustración",
+                "enojado",
+                "molesto",
+                "hartado",
+                "cansado",
+                "harto",
+                "rabia",
+                "indignado",
+                "furioso",
             ],
             "level": "MEDIO",
             "color": "🟡",
@@ -3329,9 +3539,19 @@ async def analisis_sentimiento(patient_text: str, patient_id: int | None = None)
         },
         "tristeza": {
             "keywords": [
-                "triste", "tristeza", "deprimido", "depresión", "llorando",
-                "llanto", "solo", "soledad", "vacío", "desesperanza",
-                "sin ganas", "apático", "melancolía",
+                "triste",
+                "tristeza",
+                "deprimido",
+                "depresión",
+                "llorando",
+                "llanto",
+                "solo",
+                "soledad",
+                "vacío",
+                "desesperanza",
+                "sin ganas",
+                "apático",
+                "melancolía",
             ],
             "level": "ALTO",
             "color": "🔴",
@@ -3339,8 +3559,16 @@ async def analisis_sentimiento(patient_text: str, patient_id: int | None = None)
         },
         "esperanza": {
             "keywords": [
-                "mejorar", "superar", "optimista", "esperanza", "ganar",
-                "luchar", "adelante", "positivo", "progreso", "avanzar",
+                "mejorar",
+                "superar",
+                "optimista",
+                "esperanza",
+                "ganar",
+                "luchar",
+                "adelante",
+                "positivo",
+                "progreso",
+                "avanzar",
             ],
             "level": "BAJO",
             "color": "🟢",
@@ -3348,8 +3576,15 @@ async def analisis_sentimiento(patient_text: str, patient_id: int | None = None)
         },
         "calma": {
             "keywords": [
-                "tranquilo", "calmado", "paz", "sereno", "estable",
-                "bien", "mejor", "normal", "relajado",
+                "tranquilo",
+                "calmado",
+                "paz",
+                "sereno",
+                "estable",
+                "bien",
+                "mejor",
+                "normal",
+                "relajado",
             ],
             "level": "BAJO",
             "color": "🟢",
@@ -3363,12 +3598,14 @@ async def analisis_sentimiento(patient_text: str, patient_id: int | None = None)
     for sentimiento, info in sentimentos.items():
         for keyword in info["keywords"]:
             if keyword in texto_lower:
-                detected.append({
-                    "sentimiento": sentimiento,
-                    "level": info["level"],
-                    "color": info["color"],
-                    "recommendation": info["recommendation"],
-                })
+                detected.append(
+                    {
+                        "sentimiento": sentimiento,
+                        "level": info["level"],
+                        "color": info["color"],
+                        "recommendation": info["recommendation"],
+                    }
+                )
                 break
 
     # Determine primary sentiment
@@ -3391,7 +3628,9 @@ async def analisis_sentimiento(patient_text: str, patient_id: int | None = None)
             "texto_analizado": patient_text[:200],
             "sentimiento_primario": primary["sentimiento"],
             "intensidad": intensidad,
-            "sentimientos_detectados": [d["sentimiento"] for d in detected] if detected else ["neutro"],
+            "sentimientos_detectados": [d["sentimiento"] for d in detected]
+            if detected
+            else ["neutro"],
             "recomendacion_comunicacion": primary["recommendation"],
             "indicador_visual": primary["color"],
             "nota": "Este análisis es orientativo. El profesional debe validar la evaluación.",
@@ -3447,12 +3686,14 @@ async def coordinacion_familiar(
             doctors = result.mappings().all()
 
             if not doctors:
-                resultados.append({
-                    "familiar": nombre,
-                    "specialty": especialidad,
-                    "status": "SIN_DISPO",
-                    "message": f"No doctors found for {especialidad}",
-                })
+                resultados.append(
+                    {
+                        "familiar": nombre,
+                        "specialty": especialidad,
+                        "status": "SIN_DISPO",
+                        "message": f"No doctors found for {especialidad}",
+                    }
+                )
                 continue
 
             # Find available slots for each doctor
@@ -3480,11 +3721,16 @@ async def coordinacion_familiar(
         for day_offset in range(7):
             check_date = date_obj + timedelta(days=day_offset)
             for hour in [9, 10, 11, 14, 15, 16]:
-                slot_start = datetime.combine(check_date, datetime.min.time().replace(hour=hour))
+                slot_start = datetime.combine(
+                    check_date, datetime.min.time().replace(hour=hour)
+                )
                 slot_end = slot_start + timedelta(minutes=30)
                 is_free = True
                 for occ in ocupadas:
-                    if slot_start < occ["end_datetime"] and slot_end > occ["start_datetime"]:
+                    if (
+                        slot_start < occ["end_datetime"]
+                        and slot_end > occ["start_datetime"]
+                    ):
                         is_free = False
                         break
                 if is_free:
@@ -3494,14 +3740,16 @@ async def coordinacion_familiar(
             if len(slots_libres) >= 3:
                 break
 
-        resultados.append({
-            "familiar": nombre,
-            "specialty": especialidad,
-            "suggested_doctor": doctors[0]["doctor"],
-            "available_slots": [
-                s.strftime("%Y-%m-%dT%H:%M:%S") for s in slots_libres[:3]
-            ],
-        })
+        resultados.append(
+            {
+                "familiar": nombre,
+                "specialty": especialidad,
+                "suggested_doctor": doctors[0]["doctor"],
+                "available_slots": [
+                    s.strftime("%Y-%m-%dT%H:%M:%S") for s in slots_libres[:3]
+                ],
+            }
+        )
 
     await engine.dispose()
 
@@ -3557,15 +3805,38 @@ async def teletriaje_ia(
     """
     # Rules for telehealth eligibility
     reglas_presencial = [
-        "dolor", "fiebre", "sangrado", "lesión", "herida", "fractura",
-        "examen físico", "auscultar", "palpar", "inyección", "cirugía",
-        "procedimiento", "extracción", "sutura", "curación",
+        "dolor",
+        "fiebre",
+        "sangrado",
+        "lesión",
+        "herida",
+        "fractura",
+        "examen físico",
+        "auscultar",
+        "palpar",
+        "inyección",
+        "cirugía",
+        "procedimiento",
+        "extracción",
+        "sutura",
+        "curación",
     ]
 
     reglas_virtual = [
-        "seguimiento", "control", "receta", "resultado", "consulta general",
-        "duda", "orientación", "sigma", "ansiedad leve", "insomnio",
-        "estrés", "terapia", "consejería", "plan de tratamiento",
+        "seguimiento",
+        "control",
+        "receta",
+        "resultado",
+        "consulta general",
+        "duda",
+        "orientación",
+        "sigma",
+        "ansiedad leve",
+        "insomnio",
+        "estrés",
+        "terapia",
+        "consejería",
+        "plan de tratamiento",
     ]
 
     motivo_lower = reason.lower()
@@ -3597,9 +3868,12 @@ async def teletriaje_ia(
             "confianza": confianza,
             "razon": razon,
             "preguntas_clarificacion": (
-                ["¿Presenta síntomas físicos que requieran examen?",
-                 "¿Es una consulta de seguimiento o control?"]
-                if modalidad == "A_EVALUAR" else []
+                [
+                    "¿Presenta síntomas físicos que requieran examen?",
+                    "¿Es una consulta de seguimiento o control?",
+                ]
+                if modalidad == "A_EVALUAR"
+                else []
             ),
             "nota": "El profesional debe confirmar la modalidad final.",
         },
@@ -3818,7 +4092,7 @@ async def chat_con_agente(
     """
     global _conn_str
     _conn_str = conn_str
-    
+
     # Set current language for tool functions
     set_current_language(language)
 
@@ -3874,6 +4148,7 @@ async def chat_con_agente_stream(
     *,
     conn_str: str,
     history: list[dict[str, str]] | None = None,
+    language: str = "en",
 ):
     """Streams agent response token-by-token using LangChain astream.
 
@@ -3881,9 +4156,13 @@ async def chat_con_agente_stream(
         user_message: User question or instruction.
         conn_str: DATABASE_URL for internal DB connections.
         history: Optional list of previous messages [{role, content}].
+        language: Language code for responses (en, es, pt).
     """
     global _conn_str
     _conn_str = conn_str
+
+    # Set current language for tool functions
+    set_current_language(language)
 
     # Anti-prompt-injection check
     injection_warning = _detect_injection(user_message)
