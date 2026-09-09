@@ -5,7 +5,7 @@ services:
     container_name: medical_pgvector
     environment:
       POSTGRES_DB: appointment
-      POSTGRES_USER: root
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: fc100711
     ports:
       - "5432:5432"
@@ -13,7 +13,7 @@ services:
       - pgvector_data:/var/lib/postgresql/data
       - ./script_BD:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U root -d appointment"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d appointment"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -25,7 +25,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: medical_rag_api
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload  # Cambió de app.main:app a main:app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
     working_dir: /app/app                                           # Apunta directo al interior
     ports:
       - "8000:8000"
@@ -39,7 +39,7 @@ services:
       - OLLAMA_BASE_URL=http://host.containers.internal:11434
       - OLLAMA_LLM_MODEL=llama3.2
       - OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-      - DATABASE_URL=postgresql+asyncpg://root:fc100711@postgres-vector:5432/appointment
+      - DATABASE_URL=postgresql+asyncpg://postgres:fc100711@postgres-vector:5432/appointment
       - FIRST_SUPERUSER_EMAIL=${FIRST_SUPERUSER_EMAIL}
       - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD}
       - SECRET_KEY=${SECRET_KEY}
