@@ -15,27 +15,27 @@ if TYPE_CHECKING:
 
 
 class Appointment(Base):
-    __tablename__ = "citas"
+    __tablename__ = "appointments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     patient_id: Mapped[int] = mapped_column(
-        "paciente_id", Integer, ForeignKey("pacientes.id", ondelete="RESTRICT"), nullable=False
+        Integer, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
     )
     doctor_id: Mapped[int] = mapped_column(
-        "medico_id", Integer, ForeignKey("medicos.id", ondelete="RESTRICT"), nullable=False
+        Integer, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False
     )
     status_id: Mapped[int] = mapped_column(
-        "estado_id", Integer,
-        ForeignKey("estados_cita.id", ondelete="RESTRICT"),
+        Integer,
+        ForeignKey("appointment_statuses.id", ondelete="RESTRICT"),
         nullable=False,
     )
     start_datetime: Mapped[datetime] = mapped_column(
-        "fecha_hora_inicio", DateTime(timezone=True), nullable=False
+        DateTime(timezone=True), nullable=False
     )
     end_datetime: Mapped[datetime] = mapped_column(
-        "fecha_hora_fin", DateTime(timezone=True), nullable=False
+        DateTime(timezone=True), nullable=False
     )
-    reason: Mapped[str] = mapped_column("motivo_consulta", Text, nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.current_timestamp(), nullable=True
     )

@@ -17,14 +17,14 @@ class Waitlist(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     patient_id: Mapped[int] = mapped_column(
-        "paciente_id", Integer, ForeignKey("pacientes.id", ondelete="CASCADE"), nullable=False
+        Integer, ForeignKey("patients.id", ondelete="CASCADE"), nullable=False
     )
     doctor_id: Mapped[int] = mapped_column(
-        "medico_id", Integer, ForeignKey("medicos.id", ondelete="CASCADE"), nullable=False
+        Integer, ForeignKey("doctors.id", ondelete="CASCADE"), nullable=False
     )
-    preferred_date: Mapped[date] = mapped_column("fecha_preferida", Date, nullable=False)
-    reason: Mapped[str | None] = mapped_column("motivo", Text, nullable=True)
-    status: Mapped[str] = mapped_column("estado", String(20), default="PENDING")
+    preferred_date: Mapped[date] = mapped_column(Date, nullable=False)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="PENDING")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.current_timestamp(), nullable=True
     )
@@ -32,5 +32,7 @@ class Waitlist(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    patient: Mapped[Patient] = relationship("Patient", foreign_keys=[patient_id])
+    patient: Mapped[Patient] = relationship(
+        "Patient", back_populates="waitlist_entries", foreign_keys=[patient_id]
+    )
     doctor: Mapped[Doctor] = relationship("Doctor", foreign_keys=[doctor_id])

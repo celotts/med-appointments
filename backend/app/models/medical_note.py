@@ -12,18 +12,18 @@ if TYPE_CHECKING:
 
 
 class MedicalNote(Base):
-    __tablename__ = "notas_medicas"
+    __tablename__ = "medical_notes"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     appointment_id: Mapped[int] = mapped_column(
-        "cita_id", Integer,
-        ForeignKey("citas.id", ondelete="CASCADE"),
+        Integer,
+        ForeignKey("appointments.id", ondelete="CASCADE"),
         unique=True,
         nullable=False,
     )
-    diagnosis: Mapped[str] = mapped_column("diagnostico", Text, nullable=False)
-    treatment: Mapped[str | None] = mapped_column("tratamiento", Text, nullable=True)
-    observations: Mapped[str | None] = mapped_column("observaciones", Text, nullable=True)
+    diagnosis: Mapped[str] = mapped_column(Text, nullable=False)
+    treatment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    observations: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.current_timestamp(), nullable=True
     )

@@ -1,7 +1,7 @@
 # ==========================================
 # ETAPA 1: Builder (Compilación de ruedas/wheels)
 # ==========================================
-FROM python:3.11.9-alpine3.20 AS builder
+FROM python:3.11-alpine3.22 AS builder
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # ==========================================
 # ETAPA 2: Imagen Final (Ejecución Limpia)
 # ==========================================
-FROM python:3.11.9-alpine3.20 AS runner
+FROM python:3.11-alpine3.22 AS runner
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

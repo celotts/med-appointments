@@ -13,22 +13,22 @@ if TYPE_CHECKING:
 
 
 class Doctor(Base):
-    __tablename__ = "medicos"
+    __tablename__ = "doctors"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     specialty_id: Mapped[int] = mapped_column(
-        "especialidad_id", Integer, ForeignKey("especialidades.id", ondelete="RESTRICT"), nullable=False
+        Integer, ForeignKey("specialties.id", ondelete="RESTRICT"), nullable=False
     )
     branch_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("branches.id", ondelete="SET NULL"), nullable=True
     )
-    first_name: Mapped[str] = mapped_column("nombre", String(100), nullable=False)
-    last_name: Mapped[str] = mapped_column("apellido", String(100), nullable=False)
+    first_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     professional_license: Mapped[str] = mapped_column(
-        "cedula_profesional", String(50), unique=True, nullable=False
+        String(50), unique=True, nullable=False
     )
     email: Mapped[str] = mapped_column(String(150), unique=True, nullable=False)
-    phone: Mapped[str | None] = mapped_column("telefono", String(20), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.current_timestamp(), nullable=True
     )

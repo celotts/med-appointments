@@ -41,8 +41,8 @@ async def get_dashboard_summary(
         text(
             """
             SELECT
-                (SELECT COUNT(*) FROM patients WHERE deleted_at IS NULL) AS total_patients,
-                (SELECT COUNT(*) FROM doctors WHERE deleted_at IS NULL) AS total_doctors,
+                (SELECT COUNT(*) FROM patients) AS total_patients,
+                (SELECT COUNT(*) FROM doctors) AS total_doctors,
                 (SELECT COUNT(*) FROM appointments
                  WHERE DATE(start_datetime) = CURRENT_DATE
                    AND status_id != (SELECT id FROM appointment_statuses WHERE code = 'CANCELADA')

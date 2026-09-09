@@ -11,11 +11,11 @@ if TYPE_CHECKING:
 
 
 class AppointmentStatus(Base):
-    __tablename__ = "estados_cita"
+    __tablename__ = "appointment_statuses"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    code: Mapped[str] = mapped_column("codigo", String(20), unique=True, nullable=False)
-    description: Mapped[str | None] = mapped_column("descripcion", String(100), nullable=True)
+    code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     appointments: Mapped[list[Appointment]] = relationship(
         "Appointment", back_populates="status"

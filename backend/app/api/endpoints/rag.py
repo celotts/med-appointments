@@ -174,7 +174,7 @@ async def chat(
         response = await chat_con_agente(
             chat_in.message,
             conn_str=settings.DATABASE_URL,
-            historial=history,
+            history=history,
         )
         return ChatResponse(response=response)
     except Exception:
@@ -203,7 +203,7 @@ async def chat_stream(
             async for chunk in chat_con_agente_stream(
                 chat_in.message,
                 conn_str=settings.DATABASE_URL,
-                historial=history,
+                history=history,
             ):
                 yield f"data: {json.dumps({'token': chunk})}\n\n"
             yield f"data: {json.dumps({'done': True})}\n\n"

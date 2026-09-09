@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { LogOut, User, Globe } from 'lucide-react';
+import { LogOut, User, ChevronDown } from 'lucide-react';
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -9,32 +9,33 @@ const Header: React.FC = () => {
     <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-10">
       <div className="flex items-center gap-4">
         <h1 className="text-lg font-semibold text-medical-textMain">
-          Welcome back, {user?.fullName || 'Doctor'}
+          Bienvenido, {user?.full_name || 'Usuario'}
         </h1>
       </div>
 
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2 text-sm text-medical-textMuted cursor-pointer hover:text-medical-primary transition-colors">
-          <Globe size={18} />
-          <span>English</span>
-        </div>
-
-        <div className="flex items-center gap-3 pl-6 border-l border-slate-200">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 bg-slate-100 rounded-full flex items-center justify-center text-medical-primary">
-              <User size={18} />
-            </div>
-            <span className="text-sm font-medium text-medical-textMain">{user?.fullName || 'User'}</span>
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
+          <div className="h-9 w-9 bg-medical-primary rounded-full flex items-center justify-center text-white">
+            <User size={18} />
           </div>
-
-          <button
-            onClick={logout}
-            className="p-2 text-slate-400 hover:text-red-500 transition-colors"
-            title="Logout"
-          >
-            <LogOut size={20} />
-          </button>
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-medical-textMain">
+              {user?.full_name || 'Usuario'}
+            </span>
+            <span className="text-xs text-medical-textMuted capitalize">
+              {user?.role || 'user'}
+            </span>
+          </div>
+          <ChevronDown size={14} className="text-slate-400" />
         </div>
+
+        <button
+          onClick={logout}
+          className="ml-2 p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+          title="Cerrar sesion"
+        >
+          <LogOut size={18} />
+        </button>
       </div>
     </header>
   );

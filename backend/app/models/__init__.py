@@ -9,5 +9,5 @@ from .patient import Patient as Patient
 from .role import Role as Role
 from .specialty import Specialty as Specialty
 from .user import User as User
-# from .vector_document import VectorDocument as VectorDocument  # Requires pgvector
+from .vector_document import VectorDocument as VectorDocument
 from .waitlist import Waitlist as Waitlist
