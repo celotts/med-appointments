@@ -25,12 +25,12 @@ async def get_current_user(
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
         user_id = uuid.UUID(payload.get("sub"))
-    except (jwt.JWTError, ValidationError, AttributeError):
+    except (jwt.JWTError, ValidationError, AttributeError) as err:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials.",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from err
     user = await crud_user.get_user(db, user_id=user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")

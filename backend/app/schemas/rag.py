@@ -1,7 +1,7 @@
 """Schemas for the RAG agent and vector documents."""
 
+
 from pydantic import BaseModel, ConfigDict
-from datetime import datetime
 
 
 class ChatMessage(BaseModel):

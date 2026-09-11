@@ -10,4 +10,7 @@ from .role import Role as Role
 from .specialty import Specialty as Specialty
 from .user import User as User
 from .vector_document import VectorDocument as VectorDocument
+from .consulting_room import ConsultingRoom as ConsultingRoom
+from .doctor_schedule import DoctorSchedule as DoctorSchedule
+from .medical_history import MedicalHistory as MedicalHistory
 from .waitlist import Waitlist as Waitlist

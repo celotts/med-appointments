@@ -1,6 +1,17 @@
 import React from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 
+const escapeHtml = (unsafe: string) => {
+  if (unsafe == null) return '';
+  return unsafe
+    .toString()
+    .replace(/&/g, '&')
+    .replace(/</g, '<')
+    .replace(/>/g, '>')
+    .replace(/"/g, '"')
+    .replace(/'/g, '&#039;');
+};
+
 interface Column<T> {
   header: string;
   accessor: keyof T | ((item: T) => React.ReactNode);

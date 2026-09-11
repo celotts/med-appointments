@@ -61,8 +61,8 @@ async def create_doctor(
     await _ensure_specialty(db, doctor_in.specialty_id, i18n)
     try:
         return await crud_doctor.create_doctor(db, doctor=doctor_in)
-    except IntegrityError:
-        raise i18n.error("doctor_already_exists", status_code=400)
+    except IntegrityError as exc:
+        raise i18n.error("doctor_already_exists", status_code=400) from exc
 
 
 @router.get(
@@ -110,8 +110,8 @@ async def update_doctor(
         return await crud_doctor.update_doctor(
             db, db_doctor=db_doctor, doctor=doctor_in
         )
-    except IntegrityError:
-        raise i18n.error("doctor_already_exists", status_code=400)
+    except IntegrityError as exc:
+        raise i18n.error("doctor_already_exists", status_code=400) from exc
 
 
 @router.delete(
