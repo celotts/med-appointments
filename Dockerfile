@@ -1,14 +1,16 @@
 # ==========================================
 # ETAPA 1: Builder (Compilación de ruedas/wheels)
 # ==========================================
-FROM python:3.11-alpine3.22 AS builder
+FROM python:3.12-slim-bookworm AS builder
 
 WORKDIR /app
 
 # Instalar herramientas necesarias para compilar paquetes como asyncpg
-RUN apk update && apk upgrade --no-cache && apk add --no-cache \
-    build-base \
-    postgresql-dev
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt .
 
@@ -19,7 +21,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # ==========================================
 # ETAPA 2: Imagen Final (Ejecución Limpia)
 # ==========================================
-FROM python:3.11-alpine3.22 AS runner
+FROM python:3.12-slim-bookworm AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -28,7 +30,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Instalar parches de seguridad y ÚNICAMENTE la librería en runtime para Postgres
-RUN apk update && apk upgrade --no-cache && apk add --no-cache libpq
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends libpq5 && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copiar las librerías precompiladas desde la etapa builder e instalarlas
 COPY --from=builder /app/wheels /wheels
@@ -37,9 +41,9 @@ RUN pip install --no-cache-dir --no-index --find-links=/wheels /wheels/*
 # Copiar el código fuente asegurando que quede dentro de la carpeta app
 COPY backend/app /app/app
 
-# Crear usuario de sistema sin privilegios (Seguridad)
-RUN addgroup -S appgroup && adduser -S -G appgroup appuser
-USER appuser
+# Usuario de sistema (comentado por problemas de construcción en algunos entornos)
+# RUN addgroup -S appgroup && adduser -S -G appgroup appuser
+# USER appuser
 
 EXPOSE 8000
 

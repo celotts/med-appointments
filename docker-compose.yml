@@ -1,3 +1,6 @@
+# ==========================================
+# CONFIGURACIÓN CORREGIDA PARA PODMAN/DOCKER
+# ==========================================
 
 services:
   postgres-vector:
@@ -7,8 +10,9 @@ services:
       POSTGRES_DB: appointment
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: fc100711
+    # Usamos 5433→5432, pero si está ocupado, podemos cambiar a 5434
     ports:
-      - "5432:5432"
+      - "5433:5432"  # Si da error, cambiar a "5434:5432"
     volumes:
       - pgvector_data:/var/lib/postgresql/data
       - ./script_BD:/docker-entrypoint-initdb.d
@@ -20,17 +24,18 @@ services:
     networks:
       - rag_network
 
+
   medical-rag-api:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: medical_rag_api
     command: uvicorn main:app --host 0.0.0.0 --port 8000
-    working_dir: /app/app                                           # Apunta directo al interior
+    working_dir: /app/app
     ports:
-      - "8000:8000"
+      - "5435:8000"  # Puerto del API (PostgreSQL ya usa 5433)
     volumes:
-      - ./backend/app:/app/app                                      # Monta el código dentro de app/app
+      - ./backend/app:/app/app
     extra_hosts:
       - "host.containers.internal:host-gateway"
       - "host.docker.internal:host-gateway"
@@ -39,7 +44,7 @@ services:
       - OLLAMA_BASE_URL=http://host.containers.internal:11434
       - OLLAMA_LLM_MODEL=llama3.2
       - OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-      - DATABASE_URL=postgresql+asyncpg://postgres:fc100711@postgres-vector:5432/appointment
+      - DATABASE_URL=postgresql+asyncpg://postgres:fc100711@postgres-vector:5432/appointment  # Usa 5432 (puerto interno del container)
       - FIRST_SUPERUSER_EMAIL=${FIRST_SUPERUSER_EMAIL}
       - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD}
       - SECRET_KEY=${SECRET_KEY}

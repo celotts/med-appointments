@@ -3,6 +3,16 @@
 @tailwind utilities;
 
 :root {
+  --medical-primary: #2C5AA0;
+  --medical-danger: #D22B2B;
+  --medical-warning: #F57C00;
+  --medical-success: #2E7D32;
+  --medical-textMain: #1E293B;
+  --medical-textMuted: #64748B;
+  --medical-background: #F8FAFC;
+}
+
+:root {
   font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
 

@@ -45,8 +45,8 @@ async def create_patient(
     i18n = I18nResponse(language)
     try:
         return await crud_patient.create_patient(db, patient=patient_in)
-    except IntegrityError:
-        raise i18n.error("patient_already_exists", status_code=400)
+    except IntegrityError as exc:
+        raise i18n.error("patient_already_exists", status_code=400) from exc
 
 
 @router.get(
@@ -92,8 +92,8 @@ async def update_patient(
         return await crud_patient.update_patient(
             db, db_patient=db_patient, patient=patient_in
         )
-    except IntegrityError:
-        raise i18n.error("patient_already_exists", status_code=400)
+    except IntegrityError as exc:
+        raise i18n.error("patient_already_exists", status_code=400) from exc
 
 
 @router.delete(

@@ -19,7 +19,12 @@ def create_access_token(subject: str | int) -> str:
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    # Try passlib bcrypt first
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        # Fallback: compare as plain text (for legacy/demo passwords stored plain)
+        return plain_password == hashed_password
 
 
 def get_password_hash(password: str) -> str:

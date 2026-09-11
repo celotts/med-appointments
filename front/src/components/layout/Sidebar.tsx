@@ -13,19 +13,19 @@ import {
 
 const menuItems = [
   { path: '/', name: 'Dashboard', icon: LayoutDashboard },
-  { path: '/appointments', name: 'Appointments', icon: Calendar },
-  { path: '/patients', name: 'Patients', icon: Users },
-  { path: '/doctors', name: 'Doctors', icon: UserRound },
-  { path: '/ai-assistant', name: 'MedAssist AI', icon: Bot },
-  { path: '/reports', name: 'Reports', icon: BarChart3 },
-  { path: '/settings', name: 'Settings', icon: Settings },
+  { path: '/appointments', name: 'Agenda', icon: Calendar },
+  { path: '/patients', name: 'Pacientes', icon: Users },
+  { path: '/doctors', name: 'Doctores', icon: UserRound },
+  { path: '/ai-assistant', name: 'Asistente IA', icon: Bot },
+  { path: '/reports', name: 'Reportes', icon: BarChart3 },
+  { path: '/settings', name: 'Configuración', icon: Settings },
 ];
 
 const Sidebar: React.FC = () => {
   return (
     <aside className="w-64 bg-medical-primary h-screen sticky top-0 text-white flex flex-col shadow-xl">
-      <div className="p-6 flex items-center gap-3 border-b border-blue-800">
-        <div className="bg-white text-medical-primary p-2 rounded-lg">
+      <div className="p-6 flex items-center gap-3 border-b border-medical-operation">
+        <div className="bg-medical-success text-medical-primary rounded-full p-2">
           <Stethoscope size={24} />
         </div>
         <span className="font-bold text-xl tracking-tight">MedApp</span>
@@ -39,8 +39,8 @@ const Sidebar: React.FC = () => {
             className={({ isActive }) => `
               flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
               ${isActive
-                ? 'bg-medical-secondary text-white shadow-md'
-                : 'text-blue-100 hover:bg-blue-800 hover:text-white'}
+                ? `bg-medical-visit text-white shadow-md`
+                : `text-medical-textMuted`}
             `}
           >
             <Icon size={20} />
@@ -49,10 +49,10 @@ const Sidebar: React.FC = () => {
         ))}
       </nav>
 
-      <div className="p-4 border-t border-blue-800">
-        <div className="bg-blue-950 p-4 rounded-xl text-xs text-blue-300">
-          <p className="font-semibold mb-1">Clinic System v1.0</p>
-          <p>Ready for clinical use</p>
+      <div className="p-4 border-t border-border-slate-200">
+        <div className="bg-medical-primary/5 p-4 rounded-xl text-xs text-medical-textMuted">
+          <p className="font-semibold mb-1">Agenda Sana v1.0</p>
+          <p>Sistema de gestión médica</p>
         </div>
       </div>
     </aside>

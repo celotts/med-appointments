@@ -1,3 +1,9 @@
+import sys
+from typing import Any
+
+sys.path.insert(0, "/app")
+import sys
+
 from api.endpoints import (
     appointment_statuses,
     appointments,
@@ -13,9 +19,13 @@ from api.endpoints import (
     specialties,
     users,
 )
+
+sys.path.insert(0, "/app/app")
 from core.base import Base  # noqa: F401, I001
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from initial_data import main as init_db
+
+from app.dependencies import get_current_user
 
 app = FastAPI(
     title="Medical Appointments RAG API",
@@ -38,7 +48,7 @@ def read_root():
 
 # Core endpoints
 app.include_router(login.router, prefix="/api/v1", tags=["Login"])
-app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
+(app.include_router(users.router, prefix="/api/v1", tags=["Users"]),)
 app.include_router(
     specialties.router, prefix="/api/v1/specialties", tags=["Specialties"]
 )
@@ -56,6 +66,20 @@ app.include_router(rag.router)
 app.include_router(medasist.router)
 
 # New endpoints
+
+
+@app.get(
+    "/me",
+    response_model=dict,
+    summary="Get current authenticated user",
+)
+async def get_current_user_me(
+    current_user: Any = Depends(get_current_user),
+) -> Any:
+    """Get current authenticated user."""
+    return current_user
+
+
 app.include_router(notifications.router)
 app.include_router(reports.router)
 app.include_router(integrations.router)

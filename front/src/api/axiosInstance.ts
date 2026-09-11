@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
+import { cacheApi } from './cache';
 
 const axiosInstance = axios.create({
   baseURL: '/api/v1',
@@ -20,9 +21,18 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Handle 401 and try refresh token
+// Response Interceptor: Cache successful responses
 axiosInstance.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Cache successful responses (status 200)
+    if (response.status === 200 && response.config?.url) {
+      const url = response.config.url!.replace('/api/v1/', '');
+      const cacheKey = `api_${url}`;
+      // Use default 5min TTL for cached API responses
+      cacheApi.setCache(cacheKey, response.data, 5);
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 

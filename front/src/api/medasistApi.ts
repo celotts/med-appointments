@@ -57,7 +57,38 @@ export interface FollowUpResponse {
   reason: string;
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatRequest {
+  message: string;
+  historial: ChatMessage[];
+}
+
+export interface ChatResponse {
+  respuesta: string;
+}
+
+export interface HealthCheckResponse {
+  ollama: string;
+  embedding_model: string;
+  llm_model: string;
+  vector_count: number;
+}
+
 export const medasistApi = {
+  async chat(data: ChatRequest): Promise<ChatResponse> {
+    const response = await axiosInstance.post('/rag/chat', data);
+    return response.data;
+  },
+
+  async getHealth(): Promise<HealthCheckResponse> {
+    const response = await axiosInstance.get('/rag/health');
+    return response.data;
+  },
+
   async reschedule(data: RescheduleRequest): Promise<RescheduleResponse> {
     const response = await axiosInstance.post('/medasist/reschedule', data);
     return response.data;

@@ -17,6 +17,13 @@ export const authApi = {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
     });
+
+    // Guardar token en localStorage para persistencia
+    if (response.data.access_token) {
+      localStorage.setItem('auth_token', response.data.access_token);
+      localStorage.setItem('token_type', response.data.token_type || 'bearer');
+    }
+
     return response.data;
   },
 
@@ -24,10 +31,11 @@ export const authApi = {
     // Backend doesn't have logout endpoint, just clear local storage
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user_data');
+    localStorage.removeItem('token_type');
   },
 
   async getMe(): Promise<any> {
-    const response = await axiosInstance.get('/users/me');
+    const response = await axiosInstance.get('/api/v1/me');
     return response.data;
   },
 };

@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "intellij-ce": {
+      "command": "/Applications/IntelliJ IDEA CE.app/Contents/jbr/Contents/Home/bin/java",
+      "args": [
+        "-classpath",
+        "/Applications/IntelliJ IDEA CE.app/Contents/plugins/mcpserver/lib/mcpserver-frontend.jar:/Applications/IntelliJ IDEA CE.app/Contents/lib/util-8.jar:/Applications/IntelliJ IDEA CE.app/Contents/lib/modules/intellij.libraries.ktor.client.cio.jar:/Applications/IntelliJ IDEA CE.app/Contents/lib/lib-client.jar:/Applications/IntelliJ IDEA CE.app/Contents/lib/modules/intellij.libraries.ktor.client.jar",
+        "com.intellij.mcpserver.stdio.McpStdioRunnerKt"
+      ],
+      "env": {
+        "IJ_MCP_SERVER_PORT": "64342"
+      }
+    }
+  }
+}

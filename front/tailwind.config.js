@@ -8,13 +8,21 @@ export default {
     extend: {
       colors: {
         medical: {
-          primary: '#1E3A8A',   // blue-900
-          secondary: '#3B82F6', // blue-500
-          accent: '#10B981',    // emerald-500
-          background: '#F8FAFC', // slate-50
-          surface: '#FFFFFF',
-          textMain: '#1E293B',   // slate-800
-          textMuted: '#64748B',   // slate-500
+          primary: '#2C5AA0',     // consultas
+          operation: '#D22B2B',   // operaciones
+          visit: '#F57C00',       // visitas post-operatorio
+          personal: '#2E7D32',    // actividades personales/vacaciones
+          primaryDark: '#1E3A5F',
+          secondaryDark: '#A8201F',
+          warningDark: '#C05A0E',
+          successDark: '#1A4A2E',
+        },
+        medicalText: {
+          main: '#1E293B',
+          muted: '#64748B',
+        },
+        medicalBackground: {
+          page: '#F8FAFC',
         },
       },
     },

@@ -26,7 +26,7 @@ class DashboardSummary(BaseModel):
 
 
 @router.get(
-    "/dashboard/summary",
+    "/reports/dashboard/summary",
     response_model=DashboardSummary,
     summary="Get dashboard summary",
 )

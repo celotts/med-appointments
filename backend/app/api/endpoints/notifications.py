@@ -40,7 +40,6 @@ async def send_notification(
     language: str = Depends(get_language),
 ) -> Any:
     """Sends a custom email notification."""
-    i18n = I18nResponse(language)
     result = await notification_service.send_email(
         to=request.to,
         subject=request.subject,
