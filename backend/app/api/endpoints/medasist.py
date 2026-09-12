@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from typing import List, Optional
 
 from dependencies import get_current_user, get_db
 from fastapi import APIRouter, Depends, HTTPException
@@ -28,7 +27,7 @@ class RescheduleResponse(BaseModel):
     appointment_id: int
     current_start: str
     current_end: str
-    suggestions: List[RescheduleSuggestion]
+    suggestions: list[RescheduleSuggestion]
     message: str
 
 
@@ -47,13 +46,13 @@ class ConflictCheckRequest(BaseModel):
     doctor_id: int
     start_datetime: str
     end_datetime: str
-    exclude_appointment_id: Optional[int] = None
+    exclude_appointment_id: int | None = None
 
 
 class ConflictCheckResponse(BaseModel):
     has_conflict: bool
-    conflict_details: Optional[str] = None
-    suggested_fix: Optional[str] = None
+    conflict_details: str | None = None
+    suggested_fix: str | None = None
 
 
 class FollowUpRequest(BaseModel):
@@ -75,7 +74,7 @@ async def _find_free_slots(
     doctor_id: int,
     target_date: datetime,
     duration_minutes: int,
-) -> List[AvailabilitySlot]:
+) -> list[AvailabilitySlot]:
     day_start = target_date.replace(hour=9, minute=0, second=0, microsecond=0)
     day_end = target_date.replace(hour=17, minute=0, second=0, microsecond=0)
 
@@ -189,7 +188,7 @@ async def check_conflict(
     )
 
 
-@router.post("/available-slots", response_model=List[AvailabilitySlot])
+@router.post("/available-slots", response_model=list[AvailabilitySlot])
 async def get_available_slots(
     request: AvailabilityRequest,
     db: AsyncSession = Depends(get_db),

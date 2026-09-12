@@ -3,7 +3,11 @@ import { useForm } from 'react-hook-form';
 import { patientApi, Patient, PatientCreate } from '../api/patientApi';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
+import DatePicker from 'react-datepicker';
+import { parse } from 'date-fns';
+import { format } from 'date-fns';
 import { Plus, Search, Loader2 } from 'lucide-react';
+import 'react-datepicker/dist/react-datepicker.css';
 import { toast } from 'react-hot-toast';
 
 const PatientsPage: React.FC = () => {
@@ -179,10 +183,24 @@ const PatientsPage: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-//medical-textMain mb-1">Fecha de Nacimiento *</label>
-              <input
-                type="date"
-                {...register('birth_date', { required: 'Fecha requerida' })}
+              <label className="block text-sm font-medium text-medical-textMain mb-1">Fecha de Nacimiento *</label>
+              <DatePicker
+                selected={editingPatient ? parse(editingPatient.birth_date, 'yyyy-MM-dd', new Date()) : undefined}
+                onChange={(date: any) => {
+                  if (date) {
+                    const formattedDate = format(date, 'yyyy-MM-dd');
+                    reset({
+                      first_name: editingPatient?.first_name,
+                      last_name: editingPatient?.last_name,
+                      birth_date: formattedDate,
+                      email: editingPatient?.email,
+                      phone: editingPatient?.phone,
+                    });
+                    setEditingPatient(prev => prev ? { ...prev, birth_date: formattedDate } : null);
+                  }
+                }}
+                dateFormat="yyyy-MM-dd"
+                required={true}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
               />
               {errors.birth_date && <p className="text-red-500 text-xs mt-1">{errors.birth_date.message}</p>}

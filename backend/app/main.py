@@ -1,16 +1,19 @@
 import sys
 from typing import Any
 
-sys.path.insert(0, "/app")
-import sys
+# Agregar path del paquete app para que los imports funcionen dentro del container Docker
+sys.path.insert(0, "/app/app")
 
 from api.endpoints import (
     appointment_statuses,
     appointments,
+    consulting_rooms,
+    doctor_schedules,
     doctors,
     integrations,
     login,
     medasist,
+    medical_histories,
     notifications,
     patients,
     premium,
@@ -19,8 +22,6 @@ from api.endpoints import (
     specialties,
     users,
 )
-
-sys.path.insert(0, "/app/app")
 from core.base import Base  # noqa: F401, I001
 from fastapi import Depends, FastAPI
 from initial_data import main as init_db
@@ -54,6 +55,21 @@ app.include_router(
 )
 app.include_router(doctors.router, prefix="/api/v1/doctors", tags=["Doctors"])
 app.include_router(patients.router, prefix="/api/v1/patients", tags=["Patients"])
+app.include_router(
+    consulting_rooms.router,
+    prefix="/api/v1/consulting-rooms",
+    tags=["Consulting Rooms"],
+)
+app.include_router(
+    doctor_schedules.router,
+    prefix="/api/v1/doctor-schedules",
+    tags=["Doctor Schedules"],
+)
+app.include_router(
+    medical_histories.router,
+    prefix="/api/v1/medical-histories",
+    tags=["Medical Histories"],
+)
 app.include_router(
     appointment_statuses.router,
     prefix="/api/v1/appointment-statuses",

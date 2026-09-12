@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, time
 
-from core.schemas import BaseSchema as BaseSchema
 from pydantic import BaseModel, Field, TypeAdapter
+from schemas import BaseSchema as BaseSchema
 
 
 class DoctorScheduleBase(BaseModel):
@@ -20,6 +20,18 @@ class DoctorScheduleBase(BaseModel):
 
 class DoctorScheduleCreate(DoctorScheduleBase):
     pass
+
+
+class DoctorScheduleUpdate(BaseModel):
+    doctor_id: str | None = Field(default=None, description="ID del médico (UUID)")
+    day_of_week: int | None = Field(
+        default=None, ge=1, le=7, description="Día de la semana (1=Lunes, 7=Domingo)"
+    )
+    start_time: time | None = Field(default=None, description="Hora de inicio")
+    end_time: time | None = Field(default=None, description="Hora de fin")
+    slot_duration_minutes: int | None = Field(
+        default=None, ge=1, le=120, description="Duración de la cita en minutos"
+    )
 
 
 class DoctorScheduleResponse(DoctorScheduleBase):

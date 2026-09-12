@@ -66,7 +66,7 @@ const DataTable = <T extends { id: any }>({
                   <td key={colIdx} className="px-6 py-4 text-sm text-medical-textMain">
                     {typeof col.accessor === 'function'
                       ? col.accessor(item)
-                      : (item[col.accessor] as React.ReactNode)}
+                      : escapeHtml(item[col.accessor] as string)}
                   </td>
                 ))}
                 {(onEdit || onDelete) && (
