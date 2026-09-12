@@ -35,7 +35,7 @@ export const authApi = {
   },
 
   async getMe(): Promise<any> {
-    const response = await axiosInstance.get('/api/v1/me');
+    const response = await axiosInstance.get('/me');
     return response.data;
   },
 };

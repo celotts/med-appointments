@@ -4,6 +4,24 @@
 
 /* React DatePicker CSS */
 @import 'react-datepicker/dist/react-datepicker.css';
+/* Override Tailwind warnings from react-datepicker CSS */
+.react-datepicker {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+}
+
+.react-datepicker__close-icon {
+  vertical-align: baseline !important;
+}
+
+.react-datepicker__close-icon::after {
+  vertical-align: baseline !important;
+}
+
+.react-datepicker__calendar-icon {
+  vertical-align: baseline !important;
+}
 :root {
   --medical-primary: #2C5AA0;
   --medical-danger: #D22B2B;
