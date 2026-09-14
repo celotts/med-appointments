@@ -85,26 +85,27 @@ async def get_dashboard_summary(
 async def get_appointments_by_day(
     *,
     db: AsyncSession = Depends(get_db),
-    days: int = Query(7, ge=1, le=90),
+    days: int = Query(7, ge=1, le=365),
     current_user: UserModel = Depends(get_current_user),
     language: str = Depends(get_language),
 ) -> Any:
     """Returns appointment count grouped by day for the last N days."""
+    # Build query with days parameter (validated 1-365 by FastAPI)
+    interval_days = f"INTERVAL '{days} days'"
     result = await db.execute(
         text(
-            """
+            f"""
             SELECT DATE(start_datetime) AS day,
                    COUNT(*) AS total,
                    SUM(CASE WHEN ec.code = 'COMPLETADA' THEN 1 ELSE 0 END) AS completed,
                    SUM(CASE WHEN ec.code = 'CANCELADA' THEN 1 ELSE 0 END) AS cancelled
             FROM appointments c
             JOIN appointment_statuses ec ON ec.id = c.status_id
-            WHERE c.start_datetime >= NOW() - INTERVAL ':days days'
+            WHERE c.start_datetime >= NOW() - {interval_days}
             GROUP BY day
             ORDER BY day
             """
         ),
-        {"days": days},
     )
     data = result.mappings().all()
     i18n = I18nResponse(language)
@@ -123,9 +124,11 @@ async def get_appointments_by_doctor(
     language: str = Depends(get_language),
 ) -> Any:
     """Returns appointment count grouped by doctor."""
+    # Build query with days parameter (validated 1-365 by FastAPI)
+    interval_days = f"INTERVAL '{days} days'"
     result = await db.execute(
         text(
-            """
+            f"""
             SELECT CONCAT(m.first_name, ' ', m.last_name) AS doctor,
                    e.name AS specialty,
                    COUNT(*) AS total_appointments,
@@ -135,12 +138,11 @@ async def get_appointments_by_doctor(
             JOIN doctors m ON m.id = c.doctor_id
             JOIN specialties e ON e.id = m.specialty_id
             JOIN appointment_statuses ec ON ec.id = c.status_id
-            WHERE c.start_datetime >= NOW() - INTERVAL ':days days'
+            WHERE c.start_datetime >= NOW() - {interval_days}
             GROUP BY doctor, specialty
             ORDER BY total_appointments DESC
             """
         ),
-        {"days": days},
     )
     data = result.mappings().all()
     i18n = I18nResponse(language)
@@ -159,19 +161,20 @@ async def get_no_show_rate(
     language: str = Depends(get_language),
 ) -> Any:
     """Returns no-show rate statistics."""
+    # Build query with days parameter (validated 1-365 by FastAPI)
+    interval_days = f"INTERVAL '{days} days'"
     result = await db.execute(
         text(
-            """
+            f"""
             SELECT COUNT(*) AS total,
                    SUM(CASE WHEN ec.code = 'COMPLETADA' THEN 1 ELSE 0 END) AS completed,
                    SUM(CASE WHEN ec.code = 'CANCELADA' THEN 1 ELSE 0 END) AS cancelled,
                    SUM(CASE WHEN ec.code = 'PENDIENTE' THEN 1 ELSE 0 END) AS pending
             FROM appointments c
             JOIN appointment_statuses ec ON ec.id = c.status_id
-            WHERE c.start_datetime >= NOW() - INTERVAL ':days days'
+            WHERE c.start_datetime >= NOW() - {interval_days}
             """
         ),
-        {"days": days},
     )
     row = result.mappings().first()
 
@@ -188,70 +191,3 @@ async def get_no_show_rate(
         "attendance_rate": f"{(completed / total * 100):.1f}%" if total > 0 else "0%",
         "cancellation_rate": f"{(cancelled / total * 100):.1f}%" if total > 0 else "0%",
     }
-
-
-@router.get(
-    "/reports/export/csv",
-    summary="Export appointments as CSV",
-)
-async def export_appointments_csv(
-    *,
-    db: AsyncSession = Depends(get_db),
-    days: int = Query(30, ge=1, le=365),
-    current_user: UserModel = Depends(get_current_user),
-    language: str = Depends(get_language),
-) -> Any:
-    """Exports appointments data as CSV format."""
-    import csv
-    import io
-
-    from fastapi.responses import StreamingResponse
-
-    result = await db.execute(
-        text(
-            """
-            SELECT c.id, c.start_datetime, c.end_datetime,
-                   CONCAT(p.first_name, ' ', p.last_name) AS patient,
-                   CONCAT(m.first_name, ' ', m.last_name) AS doctor,
-                   e.name AS specialty,
-                   ec.code AS status,
-                   c.reason
-            FROM appointments c
-            JOIN patients p ON p.id = c.patient_id
-            JOIN doctors m ON m.id = c.doctor_id
-            JOIN specialties e ON e.id = m.specialty_id
-            JOIN appointment_statuses ec ON ec.id = c.status_id
-            WHERE c.start_datetime >= NOW() - INTERVAL ':days days'
-            ORDER BY c.start_datetime DESC
-            """
-        ),
-        {"days": days},
-    )
-    rows = result.mappings().all()
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(
-        ["ID", "Start", "End", "Patient", "Doctor", "Specialty", "Status", "Reason"]
-    )
-
-    for row in rows:
-        writer.writerow(
-            [
-                row["id"],
-                str(row["start_datetime"]),
-                str(row["end_datetime"]),
-                row["patient"],
-                row["doctor"],
-                row["specialty"],
-                row["status"],
-                row["reason"],
-            ]
-        )
-
-    output.seek(0)
-    return StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=appointments_export.csv"},
-    )

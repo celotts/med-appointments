@@ -188,13 +188,6 @@ const PatientsPage: React.FC = () => {
                 onChange={(date: any) => {
                   if (date) {
                     const formattedDate = format(date, 'yyyy-MM-dd');
-                    reset({
-                      first_name: editingPatient?.first_name,
-                      last_name: editingPatient?.last_name,
-                      birth_date: formattedDate,
-                      email: editingPatient?.email,
-                      phone: editingPatient?.phone,
-                    });
                     setEditingPatient(prev => prev ? { ...prev, birth_date: formattedDate } : null);
                   }
                 }}
