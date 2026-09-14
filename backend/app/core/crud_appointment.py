@@ -55,13 +55,13 @@ async def get_statuses(db: AsyncSession) -> list[AppointmentStatusModel]:
 
 
 async def get_appointment(
-    db: AsyncSession, appointment_id: int
+    db: AsyncSession, appointment_id: int, user_id: int | None = None
 ) -> AppointmentModel | None:
-    result = await db.execute(
-        select(AppointmentModel)
-        .options(selectinload(AppointmentModel.status))
-        .where(AppointmentModel.id == appointment_id)
-    )
+    """Get a appointment by its ID."""
+    stmt = select(AppointmentModel).filter(AppointmentModel.id == appointment_id)
+    if user_id is not None:
+        stmt = stmt.where(AppointmentModel.user_id == user_id)
+    result = await db.execute(stmt.options(selectinload(AppointmentModel.status)))
     return result.scalars().first()
 
 
@@ -73,6 +73,7 @@ async def get_appointments(
     patient_id: int | None = None,
     doctor_id: int | None = None,
     status: str | None = None,
+    user_id: int | None = None,
 ) -> list[AppointmentModel]:
     stmt = (
         select(AppointmentModel)
@@ -88,6 +89,8 @@ async def get_appointments(
             AppointmentStatusModel.code == status
         )
         stmt = stmt.where(AppointmentModel.status_id.in_(sub))
+    if user_id is not None:
+        stmt = stmt.where(AppointmentModel.user_id == user_id)
     stmt = stmt.offset(skip).limit(limit)
     result = await db.execute(stmt)
     return result.scalars().all()
@@ -118,7 +121,7 @@ async def _has_conflict(
 
 
 async def create_appointment(
-    db: AsyncSession, appointment: AppointmentCreateSchema
+    db: AsyncSession, appointment: AppointmentCreateSchema, user_id: int
 ) -> AppointmentModel:
     if appointment.end_datetime <= appointment.start_datetime:
         raise ValueError("end_datetime must be after start_datetime")
@@ -137,6 +140,7 @@ async def create_appointment(
     db_appointment = AppointmentModel(
         patient_id=appointment.patient_id,
         doctor_id=appointment.doctor_id,
+        user_id=user_id,
         status_id=db_status.id,
         start_datetime=appointment.start_datetime,
         end_datetime=appointment.end_datetime,
@@ -145,7 +149,7 @@ async def create_appointment(
     db.add(db_appointment)
     await db.commit()
     await db.refresh(db_appointment)
-    return await get_appointment(db, db_appointment.id)
+    return await get_appointment(db, db_appointment.id, user_id=user_id)
 
 
 async def reschedule_appointment(

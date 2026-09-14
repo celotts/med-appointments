@@ -1,3 +1,5 @@
+import uuid
+
 from models.medical_history import MedicalHistory as MedicalHistoryModel
 from schemas.medical_history import MedicalHistoryCreate as MedicalHistoryCreateSchema
 from schemas.medical_history import MedicalHistoryUpdate as MedicalHistoryUpdateSchema
@@ -6,25 +8,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def get_medical_history(
-    db: AsyncSession, history_id: str
+    db: AsyncSession, history_id: str, user_id: uuid.UUID | None = None
 ) -> MedicalHistoryModel | None:
-    result = await db.execute(
-        select(MedicalHistoryModel).filter(MedicalHistoryModel.id == history_id)
-    )
+    stmt = select(MedicalHistoryModel).filter(MedicalHistoryModel.id == history_id)
+    if user_id is not None:
+        stmt = stmt.where(MedicalHistoryModel.user_id == user_id)
+    result = await db.execute(stmt)
     return result.scalars().first()
 
 
 async def get_medical_histories(
-    db: AsyncSession, skip: int = 0, limit: int = 100
+    db: AsyncSession, skip: int = 0, limit: int = 100, user_id: uuid.UUID | None = None
 ) -> list[MedicalHistoryModel]:
-    result = await db.execute(select(MedicalHistoryModel).offset(skip).limit(limit))
+    stmt = select(MedicalHistoryModel).offset(skip).limit(limit)
+    if user_id is not None:
+        stmt = stmt.where(MedicalHistoryModel.user_id == user_id)
+    result = await db.execute(stmt)
     return result.scalars().all()
 
 
 async def create_medical_history(
-    db: AsyncSession, history: MedicalHistoryCreateSchema
+    db: AsyncSession, history: MedicalHistoryCreateSchema, user_id: uuid.UUID
 ) -> MedicalHistoryModel:
-    db_history = MedicalHistoryModel(**history.model_dump())
+    db_history = MedicalHistoryModel(**history.model_dump(), user_id=user_id)
     db.add(db_history)
     await db.commit()
     await db.refresh(db_history)

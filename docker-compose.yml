@@ -10,9 +10,8 @@ services:
       POSTGRES_DB: appointment
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: fc100711
-    # Usamos 5433→5432, pero si está ocupado, podemos cambiar a 5434
     ports:
-      - "5433:5432"  # Si da error, cambiar a "5434:5432"
+      - "5433:5432"
     volumes:
       - pgvector_data:/var/lib/postgresql/data
       - ./script_BD:/docker-entrypoint-initdb.d
@@ -33,7 +32,7 @@ services:
     command: uvicorn main:app --host 0.0.0.0 --port 8000
     working_dir: /app/app
     ports:
-      - "5435:8000"  # Puerto del API (PostgreSQL ya usa 5433)
+      - "5435:8000"
     volumes:
       - ./backend/app:/app/app
     extra_hosts:
@@ -44,19 +43,40 @@ services:
       - OLLAMA_BASE_URL=http://host.containers.internal:11434
       - OLLAMA_LLM_MODEL=llama3.2
       - OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-      - DATABASE_URL=postgresql+asyncpg://postgres:fc100711@postgres-vector:5432/appointment  # Usa 5432 (puerto interno del container)
+      - DATABASE_URL=postgresql+asyncpg://postgres:fc100711@postgres-vector:5432/appointment
       - FIRST_SUPERUSER_EMAIL=${FIRST_SUPERUSER_EMAIL}
       - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD}
       - SECRET_KEY=${SECRET_KEY}
       - ACCESS_TOKEN_EXPIRE_SECONDS=${ACCESS_TOKEN_EXPIRE_SECONDS}
+      - CORS_ORIGINS=["http://localhost:3000","http://localhost:5173","http://localhost:8080"]
     depends_on:
       postgres-vector:
         condition: service_healthy
     networks:
       - rag_network
 
+
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile.front
+    container_name: medical_frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - medical-rag-api
+    environment:
+      - VITE_API_BASE_URL=http://localhost:5435
+    volumes:
+      - /app/node_modules  # Para desarrollo (quitar en producción)
+      - ./front:/app       # Para desarrollo (ver cambios al instante)
+    networks:
+      - rag_network
+
+
 volumes:
   pgvector_data:
+
 
 networks:
   rag_network:

@@ -1,3 +1,4 @@
+from typing import List
 from pydantic import EmailStr
 from pydantic_settings import BaseSettings
 
@@ -17,6 +18,13 @@ class Settings(BaseSettings):
     OLLAMA_EMBEDDING_MODEL: str = "nomic-embed-text"
     OLLAMA_LLM_MODEL: str = "llama3.2"
     EMBEDDING_DIM: int = 768
+
+    # CORS origins
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:8080",
+    ]
 
     class Config:
         # Look for .env file in the backend root directory (two levels up)

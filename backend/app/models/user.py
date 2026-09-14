@@ -25,6 +25,7 @@ class User(Base):
     role_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("roles.id")
     )
+    is_specialist: Mapped[bool] = mapped_column(Boolean, default=False)
 
     role = relationship("Role", back_populates="users", foreign_keys=[role_id])
 

@@ -68,6 +68,7 @@ CREATE TABLE users (
     phone VARCHAR(255) NOT NULL,
     phone2 VARCHAR(255) NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
+    is_specialist BOOLEAN DEFAULT FALSE,
     role_id UUID NOT NULL REFERENCES roles(id),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ,

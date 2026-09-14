@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from core.db import Base
-from sqlalchemy import DateTime, ForeignKey, Integer, Text, func
+from sqlalchemy import DateTime, ForeignKey, Integer, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from .doctor import Doctor
     from .medical_note import MedicalNote
     from .patient import Patient
+    from .user import User
 
 
 class Appointment(Base):
@@ -23,6 +24,9 @@ class Appointment(Base):
     )
     doctor_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False
+    )
+    user_id: Mapped[str] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     status_id: Mapped[int] = mapped_column(
         Integer,
@@ -44,6 +48,7 @@ class Appointment(Base):
         "Patient", back_populates="appointments", foreign_keys=[patient_id]
     )
     doctor: Mapped[Doctor] = relationship("Doctor", foreign_keys=[doctor_id])
+    user: Mapped[User] = relationship("User", foreign_keys=[user_id])
     status: Mapped[AppointmentStatus] = relationship(
         "AppointmentStatus", back_populates="appointments", foreign_keys=[status_id]
     )

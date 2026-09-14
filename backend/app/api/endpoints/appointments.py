@@ -40,6 +40,7 @@ async def list_appointments(
         patient_id=patient_id,
         doctor_id=doctor_id,
         status=status,
+        user_id=current_user.id,
     )
 
 
@@ -69,7 +70,9 @@ async def create_appointment(
     if not await crud_doctor.get_doctor(db, appointment_in.doctor_id):
         raise i18n.error("doctor_not_found", status_code=404)
     try:
-        return await crud_appointment.create_appointment(db, appointment=appointment_in)
+        return await crud_appointment.create_appointment(
+            db, appointment_in=appointment_in, user_id=current_user.id
+        )
     except ValueError as exc:
         if "at that time" in str(exc):
             raise i18n.error("appointment_already_exists", status_code=409) from exc
@@ -90,7 +93,9 @@ async def get_appointment(
 ) -> AppointmentOut:
     """Gets an appointment by ID."""
     i18n = I18nResponse(language)
-    appointment = await crud_appointment.get_appointment(db, appointment_id)
+    appointment = await crud_appointment.get_appointment(
+        db, appointment_id, user_id=current_user.id
+    )
     if not appointment:
         raise i18n.error("appointment_not_found", status_code=404)
     return appointment
@@ -116,7 +121,9 @@ async def update_appointment(
 ) -> AppointmentOut:
     """Reschedules an appointment and transitions it to RESCHEDULED status."""
     i18n = I18nResponse(language)
-    db_appointment = await crud_appointment.get_appointment(db, appointment_id)
+    db_appointment = await crud_appointment.get_appointment(
+        db, appointment_id, user_id=current_user.id
+    )
     if not db_appointment:
         raise i18n.error("appointment_not_found", status_code=404)
     try:
@@ -146,7 +153,9 @@ async def change_appointment_status(
 ) -> AppointmentOut:
     """Changes appointment status following valid transitions."""
     i18n = I18nResponse(language)
-    db_appointment = await crud_appointment.get_appointment(db, appointment_id)
+    db_appointment = await crud_appointment.get_appointment(
+        db, appointment_id, user_id=current_user.id
+    )
     if not db_appointment:
         raise i18n.error("appointment_not_found", status_code=404)
     try:
@@ -169,7 +178,9 @@ async def delete_appointment(
 ) -> dict[str, str]:
     """Deletes an appointment."""
     i18n = I18nResponse(language)
-    db_appointment = await crud_appointment.get_appointment(db, appointment_id)
+    db_appointment = await crud_appointment.get_appointment(
+        db, appointment_id, user_id=current_user.id
+    )
     if not db_appointment:
         raise i18n.error("appointment_not_found", status_code=404)
     await crud_appointment.delete_appointment(db, db_appointment)

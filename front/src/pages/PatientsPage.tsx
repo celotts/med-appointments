@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { parse } from 'date-fns';
+import { format } from 'date-fns';
+import { Plus, Search, Loader2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { patientApi, Patient, PatientCreate } from '../api/patientApi';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
 import DatePicker from 'react-datepicker';
-import { parse } from 'date-fns';
-import { format } from 'date-fns';
-import { Plus, Search, Loader2 } from 'lucide-react';
-import 'react-datepicker/dist/react-datepicker.css';
-import { toast } from 'react-hot-toast';
 
 const PatientsPage: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);

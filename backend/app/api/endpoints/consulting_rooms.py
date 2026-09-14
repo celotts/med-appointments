@@ -1,6 +1,8 @@
 from core import crud_consulting_room
 from core.db import get_db
+from dependencies import get_current_user
 from fastapi import APIRouter, Depends, HTTPException
+from models.user import User
 from schemas.consulting_room import (
     ConsultingRoomCreate,
     ConsultingRoomResponse,
@@ -13,14 +15,25 @@ router = APIRouter(prefix="/consulting-rooms", tags=["Consulting Rooms"])
 
 @router.get("/", response_model=list[ConsultingRoomResponse])
 async def list_consulting_rooms(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)
+    skip: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    return await crud_consulting_room.get_consulting_rooms(db, skip, limit)
+    return await crud_consulting_room.get_consulting_rooms(
+        db, skip, limit, user_id=current_user.id
+    )
 
 
 @router.get("/{room_id}", response_model=ConsultingRoomResponse)
-async def get_consulting_room(room_id: str, db: AsyncSession = Depends(get_db)):
-    room = await crud_consulting_room.get_consulting_room(db, room_id)
+async def get_consulting_room(
+    room_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    room = await crud_consulting_room.get_consulting_room(
+        db, room_id, user_id=current_user.id
+    )
     if not room:
         raise HTTPException(status_code=404, detail="Consulting room not found")
     return room
@@ -28,24 +41,39 @@ async def get_consulting_room(room_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.post("/", response_model=ConsultingRoomResponse, status_code=201)
 async def create_consulting_room(
-    room: ConsultingRoomCreate, db: AsyncSession = Depends(get_db)
+    room: ConsultingRoomCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    return await crud_consulting_room.create_consulting_room(db, room)
+    return await crud_consulting_room.create_consulting_room(
+        db, room, user_id=current_user.id
+    )
 
 
 @router.put("/{room_id}", response_model=ConsultingRoomResponse)
 async def update_consulting_room(
-    room_id: str, room: ConsultingRoomUpdate, db: AsyncSession = Depends(get_db)
+    room_id: str,
+    room: ConsultingRoomUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    db_room = await crud_consulting_room.update_consulting_room(db, room_id, room)
+    db_room = await crud_consulting_room.update_consulting_room(
+        db, room_id, room, user_id=current_user.id
+    )
     if not db_room:
         raise HTTPException(status_code=404, detail="Consulting room not found")
     return db_room
 
 
 @router.delete("/{room_id}", status_code=204)
-async def delete_consulting_room(room_id: str, db: AsyncSession = Depends(get_db)):
-    db_room = await crud_consulting_room.delete_consulting_room(db, room_id)
+async def delete_consulting_room(
+    room_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    db_room = await crud_consulting_room.delete_consulting_room(
+        db, room_id, user_id=current_user.id
+    )
     if not db_room:
         raise HTTPException(status_code=404, detail="Consulting room not found")
     return None

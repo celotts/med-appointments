@@ -1,9 +1,8 @@
+/* React DatePicker CSS */
+@import 'react-datepicker/dist/react-datepicker.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* React DatePicker CSS */
-@import 'react-datepicker/dist/react-datepicker.css';
 /* Override Tailwind warnings from react-datepicker CSS */
 .react-datepicker {
   appearance: none;
@@ -22,6 +21,7 @@
 .react-datepicker__calendar-icon {
   vertical-align: baseline !important;
 }
+
 :root {
   --medical-primary: #2C5AA0;
   --medical-danger: #D22B2B;

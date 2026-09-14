@@ -1,3 +1,5 @@
+import uuid
+
 from models.consulting_room import ConsultingRoom as ConsultingRoomModel
 from schemas.consulting_room import ConsultingRoomCreate as ConsultingRoomCreateSchema
 from schemas.consulting_room import ConsultingRoomUpdate as ConsultingRoomUpdateSchema
@@ -6,25 +8,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def get_consulting_room(
-    db: AsyncSession, room_id: str
+    db: AsyncSession, room_id: str, user_id: uuid.UUID | None = None
 ) -> ConsultingRoomModel | None:
-    result = await db.execute(
-        select(ConsultingRoomModel).filter(ConsultingRoomModel.id == room_id)
-    )
+    stmt = select(ConsultingRoomModel).filter(ConsultingRoomModel.id == room_id)
+    if user_id is not None:
+        stmt = stmt.where(ConsultingRoomModel.user_id == user_id)
+    result = await db.execute(stmt)
     return result.scalars().first()
 
 
 async def get_consulting_rooms(
-    db: AsyncSession, skip: int = 0, limit: int = 100
+    db: AsyncSession, skip: int = 0, limit: int = 100, user_id: uuid.UUID | None = None
 ) -> list[ConsultingRoomModel]:
-    result = await db.execute(select(ConsultingRoomModel).offset(skip).limit(limit))
+    stmt = select(ConsultingRoomModel).offset(skip).limit(limit)
+    if user_id is not None:
+        stmt = stmt.where(ConsultingRoomModel.user_id == user_id)
+    result = await db.execute(stmt)
     return result.scalars().all()
 
 
 async def create_consulting_room(
-    db: AsyncSession, room: ConsultingRoomCreateSchema
+    db: AsyncSession, room: ConsultingRoomCreateSchema, user_id: uuid.UUID
 ) -> ConsultingRoomModel:
-    db_room = ConsultingRoomModel(**room.model_dump())
+    db_room = ConsultingRoomModel(**room.model_dump(), user_id=user_id)
     db.add(db_room)
     await db.commit()
     await db.refresh(db_room)
