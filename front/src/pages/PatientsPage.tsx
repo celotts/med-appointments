@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { parse } from 'date-fns';
-import { format } from 'date-fns';
 import { Plus, Search, Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { patientApi, Patient, PatientCreate } from '../api/patientApi';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
-import DatePicker from 'react-datepicker';
+
 
 const PatientsPage: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -183,19 +181,16 @@ const PatientsPage: React.FC = () => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-medical-textMain mb-1">Fecha de Nacimiento *</label>
-              <DatePicker
-                selected={editingPatient ? parse(editingPatient.birth_date, 'yyyy-MM-dd', new Date()) : undefined}
-                onChange={(date: any) => {
-                  if (date) {
-                    const formattedDate = format(date, 'yyyy-MM-dd');
-                    setEditingPatient(prev => prev ? { ...prev, birth_date: formattedDate } : null);
-                  }
-                }}
-                dateFormat="yyyy-MM-dd"
+              <input
+                type="date"
                 required={true}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
+                value={editingPatient ? editingPatient.birth_date : ''}
+                onChange={(e) => {
+                  setEditingPatient(prev => prev ? { ...prev, birth_date: e.target.value } : null);
+                }}
               />
-              {errors.birth_date && <p className="text-red-500 text-xs mt-1">{errors.birth_date.message}</p>}
+              
             </div>
             <div>
               <label className="block text-sm font-medium text-medical-textMain mb-1">Teléfono *</label>

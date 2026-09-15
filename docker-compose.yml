@@ -62,7 +62,7 @@ services:
       dockerfile: Dockerfile.front
     container_name: medical_frontend
     ports:
-      - "3000:3000"
+      - "3000:80"
     depends_on:
       - medical-rag-api
     environment:

@@ -159,13 +159,16 @@ CREATE TABLE appointments (
     start_datetime TIMESTAMP WITH TIME ZONE NOT NULL,
     end_datetime TIMESTAMP WITH TIME ZONE NOT NULL,
     reason TEXT NOT NULL,
+    user_id UUID,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_appointments_patient FOREIGN KEY (patient_id)
         REFERENCES patients (id) ON DELETE RESTRICT,
     CONSTRAINT fk_appointments_doctor FOREIGN KEY (doctor_id)
         REFERENCES doctors (id) ON DELETE RESTRICT,
     CONSTRAINT fk_appointments_status FOREIGN KEY (status_id)
-        REFERENCES appointment_statuses (id) ON DELETE RESTRICT
+        REFERENCES appointment_statuses (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_appointments_user FOREIGN KEY (user_id)
+        REFERENCES users (id) ON DELETE SET NULL
 );
 
 

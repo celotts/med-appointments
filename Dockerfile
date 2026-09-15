@@ -21,7 +21,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # ==========================================
 # ETAPA 2: Imagen Final (Ejecución Limpia)
 # ==========================================
-FROM python:3.12-slim-bookworm AS runtime
+FROM python:3.12-slim-trixie AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

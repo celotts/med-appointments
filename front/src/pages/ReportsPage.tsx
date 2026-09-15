@@ -16,8 +16,12 @@ const ReportsPage: React.FC = () => {
         reportsApi.getAppointmentsByDoctor(),
         reportsApi.getNoShowRate(),
       ]);
-      setApptsByDoctor(Array.isArray(byDoctor) ? byDoctor : []);
-      setNoShowRate(typeof nsRate === 'number' ? nsRate : (nsRate as any)?.rate || 0);
+      // Manejo seguro de undefined/null
+      const doctorData = byDoctor && byDoctor.length > 0 ? byDoctor : [];
+      setApptsByDoctor(doctorData);
+      // Manejo seguro de undefined/null para noShowRate
+      const rateValue = nsRate !== undefined && nsRate !== null ? nsRate : 0;
+      setNoShowRate(rateValue);
     } catch (error) {
       toast.error('Error al cargar los reportes analíticos');
     } finally {
@@ -30,7 +34,7 @@ const ReportsPage: React.FC = () => {
   }, []);
 
   const exportToCSV = (data: any[], filename: string) => {
-    if (!data || data.length === 0) return;
+    if (!data || !data.length || !data[0]) return;
     const headers = Object.keys(data[0]).join(',');
     const rows = data.map(row => Object.values(row).join(',')).join('\\n');
     const csvContent = `data:text/csv;charset=utf-8,${headers}\\n${rows}`;
@@ -101,8 +105,8 @@ const ReportsPage: React.FC = () => {
           </div>
           <div>
             <p className="text-sm text-medical-textMuted font-medium">Tasa de No-Show</p>
-            <h3 className="text-2xl font-bold text-medical-textMain">{noShowRate.toFixed(1)}%</h3>
-            <p className="text-xs text-amber-600 mt-1 font-medium">Requiere atención</p>
+            <h3 className="text-2xl font-bold text-medical-textMain">{typeof noShowRate === 'number' ? noShowRate : 0}</h3>
+            
           </div>
         </div>
 
@@ -113,7 +117,7 @@ const ReportsPage: React.FC = () => {
           <div>
             <p className="text-sm text-medical-textMuted font-medium">Promedio Pacientes</p>
             <h3 className="text-2xl font-bold text-medical-textMain">
-              {(apptsByDoctor.reduce((acc, curr) => acc + curr.count, 0) / (apptsByDoctor.length || 1)).toFixed(1)}
+              {(apptsByDoctor.reduce((acc, curr) => acc + (curr.count || 0), 0) / (apptsByDoctor.length || 1))}
             </h3>
             <p className="text-xs text-slate-400 mt-1">Por profesional</p>
           </div>
