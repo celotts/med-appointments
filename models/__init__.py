@@ -1,0 +1,12 @@
+from core.db import Base as Base
+from .specialty import Specialty as Specialty
+from .branch import Branch as Branch
+from .doctor import Doctor as Doctor
+from .role import Role as Role
+from .user import User as User
+from .patient import Patient as Patient
+from .appointment_status import AppointmentStatus as AppointmentStatus
+from .appointment import Appointment as Appointment
+from .medical_note import MedicalNote as MedicalNote
+from .vector_document import VectorDocument as VectorDocument
+from .waitlist import Waitlist as Waitlist
