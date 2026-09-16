@@ -30,8 +30,9 @@ from core.base import Base  # noqa: F401, I001, E402
 from dependencies import get_current_user  # noqa: E402
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from core.config import settings  # noqa: E402
 from initial_data import main as init_db  # noqa: E402
+
+from core.config import settings  # noqa: E402
 
 app = FastAPI(
     title="Medical Appointments RAG API",

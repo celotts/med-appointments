@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from core.db import Base
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from core.db import Base
 
 if TYPE_CHECKING:
     from .doctor import Doctor

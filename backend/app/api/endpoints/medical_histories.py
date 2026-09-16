@@ -1,14 +1,15 @@
-from core import crud_medical_history
-from core.db import get_db
 from dependencies import get_current_user
 from fastapi import APIRouter, Depends, HTTPException
-from models.user import User
 from schemas.medical_history import (
     MedicalHistoryCreate,
     MedicalHistoryResponse,
     MedicalHistoryUpdate,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from core import crud_medical_history
+from core.db import get_db
+from models.user import User
 
 router = APIRouter(prefix="/medical-histories", tags=["Medical Histories"])
 

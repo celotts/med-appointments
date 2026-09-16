@@ -2,11 +2,12 @@ from datetime import datetime, timedelta
 
 from dependencies import get_current_user, get_db
 from fastapi import APIRouter, Depends, HTTPException
-from models.appointment import Appointment
-from models.user import User as UserModel
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+
+from models.appointment import Appointment
+from models.user import User as UserModel
 
 router = APIRouter(prefix="/api/v1/medasist", tags=["Medasist IA"])
 

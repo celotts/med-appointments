@@ -1,4 +1,3 @@
-from models.medical_note import MedicalNote as MedicalNoteModel
 from schemas.appointment import (
     MedicalNoteCreate as MedicalNoteCreateSchema,
 )
@@ -7,6 +6,8 @@ from schemas.appointment import (
 )
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from models.medical_note import MedicalNote as MedicalNoteModel
 
 
 async def get_note(db: AsyncSession, note_id: int) -> MedicalNoteModel | None:

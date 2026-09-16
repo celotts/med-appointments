@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from models.doctor import Doctor
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+
+from models.doctor import Doctor
 
 from .schemas import DoctorCreate
 

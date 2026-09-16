@@ -1,10 +1,11 @@
-from core import crud_user
-from core.security import create_access_token
 from dependencies import get_db
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from schemas.token import Token
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from core import crud_user
+from core.security import create_access_token
 
 router = APIRouter()
 DB_DEPENDENCY = Depends(get_db)

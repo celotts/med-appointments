@@ -1,4 +1,4 @@
-from typing import List
+
 from pydantic import EmailStr
 from pydantic_settings import BaseSettings
 
@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     EMBEDDING_DIM: int = 768
 
     # CORS origins
-    CORS_ORIGINS: List[str] = [
+    CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:8080",

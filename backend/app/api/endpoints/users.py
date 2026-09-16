@@ -1,12 +1,13 @@
 from typing import Any
 
-from core import crud_user
 from dependencies import get_current_user, get_db
 from fastapi import APIRouter, Depends, HTTPException
-from models.user import User as UserModel
 from schemas.user import User, UserCreate
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from core import crud_user
+from models.user import User as UserModel
 
 router = APIRouter()
 

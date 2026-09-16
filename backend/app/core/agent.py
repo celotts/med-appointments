@@ -4,12 +4,13 @@ import json
 import re
 from contextvars import ContextVar
 
-from core.config import settings
 from core.i18n import get_translation
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 from langchain_ollama import ChatOllama
 from sqlalchemy import text
+
+from core.config import settings
 
 # Context variable for current language
 _current_language: ContextVar[str] = ContextVar("current_language", default="en")
@@ -433,8 +434,9 @@ async def ejecutar_reagendamiento(
     try:
         async with async_session() as db:
             import core.base  # noqa: F401  (registers all models/mappers)
-            from core import crud_appointment
             from schemas.appointment import AppointmentUpdate
+
+            from core import crud_appointment
 
             db_appointment = await crud_appointment.get_appointment(db, appointment_id)
             if not db_appointment:
@@ -485,11 +487,12 @@ async def cancelar_cita(appointment_id: int, confirmado: bool = False) -> str:
     try:
         async with async_session() as db:
             import core.base  # noqa: F401  (registers all models/mappers)
-            from core import crud_appointment
             from schemas.appointment import (
                 AppointmentStatusCode,
                 AppointmentStatusUpdate,
             )
+
+            from core import crud_appointment
 
             db_appointment = await crud_appointment.get_appointment(db, appointment_id)
             if not db_appointment:

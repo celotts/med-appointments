@@ -4,13 +4,11 @@ import json
 from typing import Any
 
 from core.agent import chat_con_agente, chat_con_agente_stream
-from core.config import settings
 from core.rag import ingest_document, search_documents
 from dependencies import get_current_user, get_db
 from dependencies_i18n import I18nResponse, get_language
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-from models.user import User as UserModel
 from schemas.rag import (
     ChatRequest,
     ChatResponse,
@@ -22,6 +20,9 @@ from schemas.rag import (
 )
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.config import settings
+from models.user import User as UserModel
 
 router = APIRouter(prefix="/api/v1", tags=["RAG & AI Agent"])
 

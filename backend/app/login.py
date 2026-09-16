@@ -1,9 +1,10 @@
 # hi clott
 from api import dependencies
-from core import crud_user
-from core.security import create_access_token
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from pydantic import BaseModel
+
+from core import crud_user
+from core.security import create_access_token
 
 
 class FormData(BaseModel):

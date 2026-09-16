@@ -1,7 +1,5 @@
 from datetime import datetime
 
-from models.appointment import Appointment as AppointmentModel
-from models.appointment_status import AppointmentStatus as AppointmentStatusModel
 from schemas.appointment import (
     VALID_TRANSITIONS,
     AppointmentStatusCode,
@@ -16,6 +14,9 @@ from schemas.appointment import (
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+from models.appointment import Appointment as AppointmentModel
+from models.appointment_status import AppointmentStatus as AppointmentStatusModel
 
 # Statuses that block the doctor's schedule (prevent booking in that slot)
 _STATUSES_THAT_OCCUPY = (

@@ -1,8 +1,6 @@
-from core import crud_appointment, crud_doctor, crud_medical_note, crud_patient
 from dependencies import get_current_user, get_db
 from dependencies_i18n import I18nResponse, get_language
 from fastapi import APIRouter, Depends, HTTPException
-from models.user import User as UserModel
 from schemas.appointment import (
     AppointmentCreate,
     AppointmentOut,
@@ -14,6 +12,9 @@ from schemas.appointment import (
 )
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from core import crud_appointment, crud_doctor, crud_medical_note, crud_patient
+from models.user import User as UserModel
 
 router = APIRouter(prefix="/api/v1", tags=["Appointments"])
 

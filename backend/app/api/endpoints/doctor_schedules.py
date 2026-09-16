@@ -1,14 +1,15 @@
-from core import crud_doctor_schedule
-from core.db import get_db
 from dependencies import get_current_user
 from fastapi import APIRouter, Depends, HTTPException
-from models.user import User
 from schemas.doctor_schedule import (
     DoctorScheduleCreate,
     DoctorScheduleResponse,
     DoctorScheduleUpdate,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from core import crud_doctor_schedule
+from core.db import get_db
+from models.user import User
 
 router = APIRouter(prefix="/doctor-schedules", tags=["Doctor Schedules"])
 

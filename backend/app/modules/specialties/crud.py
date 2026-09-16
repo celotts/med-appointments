@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from models.specialty import Specialty
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+
+from models.specialty import Specialty
 
 from .schemas import SpecialtyCreate
 

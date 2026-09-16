@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from core.db import Base
 from sqlalchemy import DateTime, Integer, String, Text, func
 
 # Note: pgvector type can be imported if needed, e.g., from pgvector.sqlalchemy import Vector
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import UserDefinedType
+
+from core.db import Base
 
 
 class Vector(UserDefinedType):

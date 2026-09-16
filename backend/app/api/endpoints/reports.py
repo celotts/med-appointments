@@ -5,10 +5,11 @@ from typing import Any
 from dependencies import get_current_user, get_db
 from dependencies_i18n import I18nResponse, get_language
 from fastapi import APIRouter, Depends, Query
-from models.user import User as UserModel
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from models.user import User as UserModel
 
 router = APIRouter(prefix="/api/v1", tags=["Reports & Dashboard"])
 

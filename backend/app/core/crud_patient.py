@@ -1,8 +1,9 @@
-from models.patient import Patient as PatientModel
 from schemas.patient import PatientCreate as PatientCreateSchema
 from schemas.patient import PatientUpdate as PatientUpdateSchema
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from models.patient import Patient as PatientModel
 
 
 async def get_patient(db: AsyncSession, patient_id: int) -> PatientModel | None:

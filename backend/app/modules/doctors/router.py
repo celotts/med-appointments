@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from core.db import get_db
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.db import get_db
 
 from . import crud
 from .schemas import DoctorCreate, DoctorResponse

@@ -1,12 +1,13 @@
 from typing import Any
 
-from core import crud_appointment
 from dependencies import get_current_user, get_db
 from dependencies_i18n import get_language
 from fastapi import APIRouter, Depends
-from models.user import User as UserModel
 from schemas.appointment import AppointmentStatusOut
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from core import crud_appointment
+from models.user import User as UserModel
 
 router = APIRouter()
 

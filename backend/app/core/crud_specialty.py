@@ -1,8 +1,9 @@
-from models.specialty import Specialty as SpecialtyModel
 from schemas.specialty import SpecialtyCreate as SpecialtyCreateSchema
 from schemas.specialty import SpecialtyUpdate as SpecialtyUpdateSchema
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from models.specialty import Specialty as SpecialtyModel
 
 
 async def get_specialty(db: AsyncSession, specialty_id: int) -> SpecialtyModel | None:

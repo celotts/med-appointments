@@ -1,7 +1,5 @@
 import uuid
 
-from core.security import get_password_hash, verify_password
-from models.user import User as UserModel
 from schemas.user import (
     UserCreate as UserCreateSchema,
 )
@@ -10,6 +8,9 @@ from schemas.user import (
 )
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.security import get_password_hash, verify_password
+from models.user import User as UserModel
 
 
 async def get_user(db: AsyncSession, user_id: uuid.UUID) -> UserModel | None:

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from core.db import Base
 from sqlalchemy import DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
+
+from core.db import Base
 
 
 class Branch(Base):
