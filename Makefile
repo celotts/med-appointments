@@ -1,4 +1,4 @@
-# Makefile para gestionar los contenedores con Podman Compose
+# Makefile para gestionar los contenedores con Docker Compose
 
 .DEFAULT_GOAL := help
 
@@ -23,7 +23,7 @@ help:
 
 up:
 	@echo "Levantando los contenedores..."
-	podman-compose up -d --build
+	docker compose up -d --build
 
 up-prueba: up
 	@echo "Esperando a que la API esté lista..."
@@ -33,36 +33,36 @@ up-prueba: up
 
 down:
 	@echo "Deteniendo contenedores y eliminando volúmenes..."
-	podman-compose down -v
+	docker compose down -v
 	@echo "Limpiando contenedores huérfanos..."
-	podman container prune -f 2>/dev/null || true
+	docker container prune -f 2>/dev/null || true
 
 start: down up
 
 logs:
 	@echo "Mostrando los logs de los contenedores..."
-	podman-compose logs -f
+	docker compose logs -f
 
 ps:
 	@echo "Listando los contenedores..."
-	podman-compose ps
+	docker compose ps
 
 clean: down
 	@echo "Limpiando sistema de Podman..."
-	podman system prune -f
+	docker system prune -f
 
 shell:
 	@echo "Iniciando shell en el contenedor medical_rag_api..."
-	podman-compose exec medical-rag-api /bin/sh
+	docker compose exec medical-rag-api /bin/sh
 
 lint:
 	@echo "Ejecutando linter (flake8)..."
-	podman-compose exec medical-rag-api flake8 backend
+	docker compose exec medical-rag-api flake8 backend
 
 format:
 	@echo "Formateando el código con black y isort..."
-	podman-compose exec medical-rag-api black backend
-	podman-compose exec medical-rag-api isort backend
+	docker compose exec medical-rag-api black backend
+	docker compose exec medical-rag-api isort backend
 
 seed:
 	@./scripts/seed.sh

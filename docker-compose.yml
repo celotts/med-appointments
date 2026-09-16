@@ -35,6 +35,9 @@ services:
       - "5435:8000"
     volumes:
       - ./backend/app:/app/app
+      - ./backend/.env:/app/.env:ro
+    env_file:
+      - .env
     extra_hosts:
       - "host.containers.internal:host-gateway"
       - "host.docker.internal:host-gateway"
@@ -44,10 +47,6 @@ services:
       - OLLAMA_LLM_MODEL=llama3.2
       - OLLAMA_EMBEDDING_MODEL=nomic-embed-text
       - DATABASE_URL=postgresql+asyncpg://postgres:fc100711@postgres-vector:5432/appointment
-      - FIRST_SUPERUSER_EMAIL=${FIRST_SUPERUSER_EMAIL}
-      - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD}
-      - SECRET_KEY=${SECRET_KEY}
-      - ACCESS_TOKEN_EXPIRE_SECONDS=${ACCESS_TOKEN_EXPIRE_SECONDS}
       - CORS_ORIGINS=["http://localhost:3000","http://localhost:5173","http://localhost:8080"]
     depends_on:
       postgres-vector:

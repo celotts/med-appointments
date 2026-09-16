@@ -4,8 +4,8 @@ Revision ID: 20240101_01
 Revision Notes: Add is_specialist column to users table for specialist agenda feature
 
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = 'add_is_specialist_to_users'

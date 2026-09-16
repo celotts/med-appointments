@@ -9,9 +9,10 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 sys.path.insert(0, "app")
 
+import core.base  # noqa: F401, E402  (registra todos los modelos en Base.metadata)
+
 from core.config import settings  # noqa: E402
 from core.db import Base  # noqa: E402
-import core.base  # noqa: F401, E402  (registra todos los modelos en Base.metadata)
 
 config = context.config
 

@@ -27,9 +27,9 @@ class Settings(BaseSettings):
     ]
 
     class Config:
-        # Look for .env file in the backend root directory (two levels up)
-        # from this file's location (app/core/config.py)
-        env_file = "../../.env"
+        # Look for .env file relative to this file's location
+        env_file = "../.env"
+        env_file_encoding = "utf-8"
 
 
 settings = Settings()
