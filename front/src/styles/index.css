@@ -1,45 +1,36 @@
-/* React DatePicker CSS */
-@import 'react-datepicker/dist/react-datepicker.css';
+/* Tailwind base styles */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-/* Override Tailwind warnings from react-datepicker CSS */
-.react-datepicker {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: textfield;
-}
 
-.react-datepicker__close-icon {
-  vertical-align: baseline !important;
-}
-
-.react-datepicker__close-icon::after {
-  vertical-align: baseline !important;
-}
-
-.react-datepicker__calendar-icon {
-  vertical-align: baseline !important;
-}
-
+/* Custom medical theme variables */
 :root {
   --medical-primary: #2C5AA0;
   --medical-danger: #D22B2B;
   --medical-warning: #F57C00;
   --medical-success: #2E7D32;
   --medical-textMain: #1E293B;
-  --medical-textMuted: #64748B;
-  --medical-background: #F8FAFC;
 }
 
-:root {
-  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
-}
-
-body {
+/* Input types */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
   margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  background-color: #F8FAFC;
-  color: #1E293B;
+}
+
+input[type=number] {
+  -moz-appearance: none;
+}
+
+/* Selection styles */
+::selection {
+  background-color: var(--medical-primary);
+  color: white;
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid var(--medical-secondary);
+  outline-offset: 2px;
 }

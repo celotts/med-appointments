@@ -7,9 +7,9 @@ const API_BASE_URL = 'http://localhost:5435';
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  // No establezcamos Content-Type por defecto aquí
+  // dejaremos que cada llamada especifique el Content-Type adecuado
+  headers: {},
 });
 
 // Interceptor: Agrega el token a CADA petición automáticamente
@@ -18,6 +18,13 @@ api.interceptors.request.use(
     const token = localStorage.getItem('access_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    // Si el contenido ya viene definido (FormData, URLSearchParams, etc.), no lo sobrescribamos
+    // sino que aseguremos que el Content-Type sea el correcto
+    if (config.data instanceof FormData || config.data instanceof URLSearchParams) {
+      config.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    } else if (!config.headers['Content-Type'] && config.data && typeof config.data === 'object') {
+      config.headers['Content-Type'] = 'application/json';
     }
     return config;
   },
