@@ -114,14 +114,14 @@ docker-help:
 # Levanta contenedores usando Podman Compose
 up-podman:
 	@echo "Levantando contenedores con Podman..."
-	podan-compose up -d --build
+	podman-compose up -d --build
 
 # Detiene y limpia usando Podman
 down-podman:
 	@echo "Deteniendo contenedores con Podman..."
-	podan-compose down -v
+	podman-compose down -v
 	@echo "Limpiando contenedores huérfanos..."
-	podan container prune -f 2>/dev/null || true
+	podman container prune -f 2>/dev/null || true
 
 # Reinicia usando Podman
 start-podman: down-podman up-podman
@@ -129,33 +129,33 @@ start-podman: down-podman up-podman
 # Logs usando Podman
 logs-podman:
 	@echo "Mostrando los logs con Podman..."
-	podan-compose logs -f
+	podman-compose logs -f
 
 # Estado usando Podman
 ps-podman:
 	@echo "Listando los contenedores con Podman..."
-	podan-compose ps
+	podman-compose ps
 
 # Limpieza completa usando Podman
 clean-podman: down-podman
 	@echo "Limpiando sistema de Podman..."
-	podan system prune -f
+	podman system prune -f
 
 # Shell usando Podman
 shell-podman:
 	@echo "Shell en contenedor API (Podman)..."
-	podan-compose exec medical-rag-api /bin/sh
+	podman-compose exec medical-rag-api /bin/sh
 
 # Linter usando Podman
 lint-podman:
 	@echo "Linter con flake8 (Podman)..."
-	podal-compose exec medical-rag-api flake8 backend
+	podman-compose exec medical-rag-api flake8 backend
 
 # Formatear usando Podman
 format-podman:
 	@echo "Formateando con black e isort (Podman)..."
-	podal-compose exec medical-rag-api black backend
-	podal-compose exec medical-rag-api isort backend
+	podman-compose exec medical-rag-api black backend
+	podman-compose exec medical-rag-api isort backend
 
 # Datos de prueba (mismo script)
 seed-podman:
