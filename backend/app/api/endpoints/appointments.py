@@ -1,6 +1,8 @@
+from typing import Any, Optional
+
 from dependencies import get_current_user, get_db
 from dependencies_i18n import I18nResponse, get_language
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from schemas.appointment import (
     AppointmentCreate,
     AppointmentOut,
@@ -31,6 +33,7 @@ async def list_appointments(
     patient_id: int | None = None,
     doctor_id: int | None = None,
     status: str | None = None,
+    enrich_visuals: bool = Query(True, description="Enrich with visual indicators (delayed, proximity)"),
     current_user: UserModel = Depends(get_current_user),
 ) -> list[AppointmentOut]:
     """List of appointments with optional filters by patient, doctor, and status."""
@@ -42,6 +45,7 @@ async def list_appointments(
         doctor_id=doctor_id,
         status=status,
         user_id=current_user.id,
+        enrich_visuals=enrich_visuals,
     )
 
 
@@ -91,6 +95,7 @@ async def get_appointment(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
     language: str = Depends(get_language),
+    enrich_visuals: bool = Query(True, description="Enrich with visual indicators"),
 ) -> AppointmentOut:
     """Gets an appointment by ID."""
     i18n = I18nResponse(language)
@@ -99,6 +104,12 @@ async def get_appointment(
     )
     if not appointment:
         raise i18n.error("appointment_not_found", status_code=404)
+    
+    if True:  # Always enrich single appointment
+        from core.crud_visual_indicator import enrich_appointments_with_visuals
+        appointments = await crud_visual_indicator.enrich_appointments_with_visuals(db, [appointment])
+        return appointments[0]
+    
     return appointment
 
 

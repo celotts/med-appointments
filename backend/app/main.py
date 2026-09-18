@@ -25,11 +25,13 @@ from api.endpoints import (  # noqa: E402
     reports,
     specialties,
     users,
+    visual_indicators,
 )
 from core.base import Base  # noqa: F401, I001, E402
 from dependencies import get_current_user  # noqa: E402
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.routing import APIRoute
 from initial_data import main as init_db  # noqa: E402
 
 from core.config import settings  # noqa: E402
@@ -94,10 +96,39 @@ app.include_router(
 app.include_router(appointments.router)
 app.include_router(rag.router)
 
+# Visual Indicators - manually add routes with proper prefix
+from api.endpoints import visual_indicators
+from fastapi.routing import APIRoute
+
+for route in visual_indicators.router.routes:
+    new_route = APIRoute(
+        path="/api/v1/visual-indicators" + route.path,
+        endpoint=route.endpoint,
+        methods=route.methods,
+        name=route.name,
+        response_model=route.response_model,
+        dependencies=route.dependencies,
+        include_in_schema=route.include_in_schema,
+        deprecated=route.deprecated,
+        response_model_include=route.response_model_include,
+        response_model_exclude=route.response_model_exclude,
+        response_model_by_alias=route.response_model_by_alias,
+        response_model_exclude_unset=route.response_model_exclude_unset,
+        response_model_exclude_defaults=route.response_model_exclude_defaults,
+        response_model_exclude_none=route.response_model_exclude_none,
+        callbacks=route.callbacks,
+        openapi_extra=route.openapi_extra,
+    )
+    app.router.routes.append(new_route)
+
 # Medasist IA
 app.include_router(medasist.router)
 
-# New endpoints
+# Other endpoints
+app.include_router(notifications.router)
+app.include_router(reports.router)
+app.include_router(integrations.router)
+app.include_router(premium.router)
 
 
 @app.get(
@@ -112,7 +143,13 @@ async def get_current_user_me(
     return {k: v for k, v in current_user.__dict__.items() if not k.startswith("_")}
 
 
-app.include_router(notifications.router)
-app.include_router(reports.router)
-app.include_router(integrations.router)
-app.include_router(premium.router)
+@app.get("/")
+def read_root():
+    return {"status": "ok"}
+
+
+@app.on_event("startup")
+async def on_startup():
+    # Run initialization logic on startup
+    # This is safe because the internal logic prevents duplication
+    await init_db()
