@@ -7,6 +7,7 @@ export interface Doctor {
   document_number: string;
   professional_license: string;
   specialty_id: number;
+  branch_id?: number | null;
   email: string;
   phone?: string | null;
   created_at?: string;
@@ -18,6 +19,7 @@ export interface DoctorCreate {
   document_number: string;
   professional_license: string;
   specialty_id: number;
+  branch_id?: number | null;
   email: string;
   phone?: string | null;
 }

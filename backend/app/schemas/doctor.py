@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr
 
 class DoctorBase(BaseModel):
     specialty_id: int
+    branch_id: int | None = None
     first_name: str
     last_name: str
     document_number: str
@@ -19,6 +20,7 @@ class DoctorCreate(DoctorBase):
 
 class DoctorUpdate(BaseModel):
     specialty_id: int | None = None
+    branch_id: int | None = None
     first_name: str | None = None
     last_name: str | None = None
     document_number: str | None = None

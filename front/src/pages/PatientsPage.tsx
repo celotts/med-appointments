@@ -169,6 +169,15 @@ const PatientsPage: React.FC = () => {
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-medical-textMain mb-1">Documento *</label>
+            <input
+              {...register('document_number', { required: 'El documento es requerido' })}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
+            />
+            {errors.document_number && <p className="text-red-500 text-xs mt-1">{errors.document_number.message}</p>}
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-medical-textMain mb-1">Email *</label>
             <input
               type="email"

@@ -1,4 +1,5 @@
 
+from typing import List
 from pydantic import EmailStr
 from pydantic_settings import BaseSettings
 
@@ -12,6 +13,9 @@ class Settings(BaseSettings):
     # Secret key and token expiration time in seconds
     SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_SECONDS: int = 90000  # 25 horas por defecto
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    DEBUG: bool = False
 
     # Ollama / RAG
     OLLAMA_BASE_URL: str = "http://localhost:11434"
@@ -20,7 +24,7 @@ class Settings(BaseSettings):
     EMBEDDING_DIM: int = 768
 
     # CORS origins
-    CORS_ORIGINS: list[str] = [
+    CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:8080",
@@ -30,6 +34,7 @@ class Settings(BaseSettings):
         # Look for .env file relative to this file's location
         env_file = "../.env"
         env_file_encoding = "utf-8"
+        extra = "allow"
 
 
 settings = Settings()

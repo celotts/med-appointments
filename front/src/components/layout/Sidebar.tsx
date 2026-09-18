@@ -8,7 +8,12 @@ import {
   Bot,
   BarChart3,
   Settings,
-  Stethoscope
+  Stethoscope,
+  Building2,
+  Shield,
+  ClipboardList,
+  Building,
+  CalendarClock
 } from 'lucide-react';
 
 const menuItems = [
@@ -16,6 +21,12 @@ const menuItems = [
   { path: '/appointments', name: 'Agenda', icon: Calendar },
   { path: '/patients', name: 'Pacientes', icon: Users },
   { path: '/doctors', name: 'Doctores', icon: UserRound },
+  { path: '/specialties', name: 'Especialidades', icon: Stethoscope },
+  { path: '/branches', name: 'Sucursales', icon: Building2 },
+  { path: '/roles', name: 'Roles', icon: Shield },
+  { path: '/appointment-statuses', name: 'Estados Cita', icon: ClipboardList },
+  { path: '/consulting-rooms', name: 'Consultorios', icon: Building },
+  { path: '/doctor-schedules', name: 'Horarios', icon: CalendarClock },
   { path: '/ai-assistant', name: 'Asistente IA', icon: Bot },
   { path: '/reports', name: 'Reportes', icon: BarChart3 },
   { path: '/settings', name: 'Configuración', icon: Settings },

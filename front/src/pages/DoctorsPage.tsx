@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { doctorApi, Doctor, DoctorCreate } from '../api/doctorApi';
 import { specialtyApi, Specialty } from '../api/specialtyApi';
+import { branchApi, Branch } from '../api/branchApi';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
 import { Plus, Search, Loader2 } from 'lucide-react';
@@ -10,6 +11,7 @@ import { toast } from 'react-hot-toast';
 const DoctorsPage: React.FC = () => {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState<Doctor | null>(null);
@@ -19,12 +21,14 @@ const DoctorsPage: React.FC = () => {
   const loadDoctors = async () => {
     try {
       setIsLoading(true);
-      const [data, specs] = await Promise.all([
+      const [data, specs, branchData] = await Promise.all([
         doctorApi.getAll(),
         specialtyApi.getAll(),
+        branchApi.getAll(),
       ]);
       setDoctors(Array.isArray(data) ? data : []);
       setSpecialties(Array.isArray(specs) ? specs : []);
+      setBranches(Array.isArray(branchData) ? branchData : []);
     } catch (error) {
       toast.error('Error al cargar doctores');
     } finally {
@@ -36,7 +40,7 @@ const DoctorsPage: React.FC = () => {
 
   const openCreate = () => {
     setEditingDoctor(null);
-    reset({ first_name: '', last_name: '', document_number: '', email: '', phone: '', professional_license: '', specialty_id: 0 });
+    reset({ first_name: '', last_name: '', document_number: '', email: '', phone: '', professional_license: '', specialty_id: 0, branch_id: null });
     setIsModalOpen(true);
   };
 
@@ -50,6 +54,7 @@ const DoctorsPage: React.FC = () => {
       phone: doctor.phone || '',
       professional_license: doctor.professional_license,
       specialty_id: doctor.specialty_id,
+      branch_id: doctor.branch_id ?? null,
     });
     setIsModalOpen(true);
   };
@@ -95,6 +100,7 @@ const DoctorsPage: React.FC = () => {
     { header: 'Telefono', accessor: (d: Doctor) => d.phone || '-' },
     { header: 'Licencia', accessor: 'professional_license' as const },
     { header: 'Especialidad', accessor: (d: Doctor) => specialties.find((s) => s.id === d.specialty_id)?.name || '-' },
+    { header: 'Sucursal', accessor: (d: Doctor) => branches.find((b) => b.id === d.branch_id)?.name || '-' },
   ];
 
   return (
@@ -247,6 +253,21 @@ const DoctorsPage: React.FC = () => {
               ))}
             </select>
             {errors.specialty_id && <p className="text-red-500 text-xs mt-1">{errors.specialty_id.message}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-medical-textMain mb-1">Sucursal</label>
+            <select
+              {...register('branch_id', {
+                setValueAs: (v) => (v === '' || v === null ? undefined : Number(v))
+              })}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
+            >
+              <option value="">Sin sucursal asignada</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+            {errors.branch_id && <p className="text-red-500 text-xs mt-1">{errors.branch_id.message}</p>}
           </div>
           <div className="pt-4 flex justify-end gap-3">
             <button

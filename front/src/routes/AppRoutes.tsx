@@ -6,6 +6,12 @@ import DashboardPage from '../pages/DashboardPage';
 import PatientsPage from '../pages/PatientsPage';
 import DoctorsPage from '../pages/DoctorsPage';
 import AppointmentsPage from '../pages/AppointmentsPage';
+import SpecialtyPage from '../pages/SpecialtyPage';
+import BranchPage from '../pages/BranchPage';
+import RolePage from '../pages/RolePage';
+import AppointmentStatusPage from '../pages/AppointmentStatusPage';
+import ConsultingRoomPage from '../pages/ConsultingRoomPage';
+import DoctorSchedulePage from '../pages/DoctorSchedulePage';
 import AIAssistantPage from '../pages/AIAssistantPage';
 import ReportsPage from '../pages/ReportsPage';
 import SettingsPage from '../pages/SettingsPage';
@@ -22,6 +28,12 @@ const AppRoutes: React.FC = () => {
           <Route path="/appointments" element={<AppointmentsPage />} />
           <Route path="/patients" element={<PatientsPage />} />
           <Route path="/doctors" element={<DoctorsPage />} />
+          <Route path="/specialties" element={<SpecialtyPage />} />
+          <Route path="/branches" element={<BranchPage />} />
+          <Route path="/roles" element={<RolePage />} />
+          <Route path="/appointment-statuses" element={<AppointmentStatusPage />} />
+          <Route path="/consulting-rooms" element={<ConsultingRoomPage />} />
+          <Route path="/doctor-schedules" element={<DoctorSchedulePage />} />
           <Route path="/ai-assistant" element={<AIAssistantPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
