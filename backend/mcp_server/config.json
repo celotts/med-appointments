@@ -1,0 +1,20 @@
+{
+  "name": "MedAppointments MCP",
+  "title": "MedAppointments MCP Server",
+  "description": "Herramientas de agenda para citas médicas: consulta, creación, actualización, disponibilidad y reprogramación.",
+  "instructions": "Usa estas herramientas para leer o modificar citas, evaluar disponibilidad de doctores y sugerir reprogramaciones. Fechas en formato ISO 8601.",
+  "transport": "stdio",
+  "host": "127.0.0.1",
+  "port": 8765,
+  "log_level": "INFO",
+  "database_url": null,
+  "tools": {
+    "appointments": {
+      "enabled": true,
+      "include": ["appointment_list", "appointment_get", "appointment_create", "appointment_update"]
+    },
+    "scheduling": {
+      "enabled": true
+    }
+  }
+}
