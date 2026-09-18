@@ -17,6 +17,17 @@ const statusColors: Record<string, string> = {
   'REAGENDADA': 'bg-indigo-100 text-indigo-700 border-indigo-200',
 };
 
+const OCCUPYING_STATUSES = ['PENDIENTE', 'CONFIRMADA', 'REAGENDADA'];
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+const toLocalInput = (iso?: string) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 const AppointmentsPage: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -27,7 +38,7 @@ const AppointmentsPage: React.FC = () => {
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<AppointmentCreate>();
+  const { register, handleSubmit, reset, getValues, formState: { errors, isSubmitting } } = useForm<AppointmentCreate>();
 
   const loadData = async () => {
     try {
@@ -53,13 +64,37 @@ const AppointmentsPage: React.FC = () => {
     loadData();
   }, []);
 
+  const patientName = (id: number) => {
+    const p = patients.find((x) => x.id === id);
+    return p ? `${p.first_name} ${p.last_name}` : `Paciente #${id}`;
+  };
+  const doctorName = (id: number) => {
+    const d = doctors.find((x) => x.id === id);
+    return d ? `Dr. ${d.first_name} ${d.last_name}` : `Médico #${id}`;
+  };
+
+  const hasDoctorConflict = (start?: string, end?: string, doctorId?: number) => {
+    if (!start || !end || !doctorId) return false;
+    const s = new Date(start).getTime();
+    const e = new Date(end).getTime();
+    if (isNaN(s) || isNaN(e)) return false;
+    return appointments.some(
+      (a) =>
+        a.doctor_id === Number(doctorId) &&
+        a.id !== editingAppointment?.id &&
+        OCCUPYING_STATUSES.includes((a.status?.code || '').toUpperCase()) &&
+        new Date(a.start_datetime).getTime() < e &&
+        new Date(a.end_datetime).getTime() > s
+    );
+  };
+
   const openCreate = () => {
     setEditingAppointment(null);
     reset({
       patient_id: 0,
       doctor_id: 0,
-      status_id: 1,
-      appointment_date: '',
+      start_datetime: '',
+      end_datetime: '',
       reason: '',
     });
     setIsModalOpen(true);
@@ -70,26 +105,43 @@ const AppointmentsPage: React.FC = () => {
     reset({
       patient_id: appt.patient_id,
       doctor_id: appt.doctor_id,
-      status_id: appt.status_id,
-      appointment_date: appt.appointment_date,
+      start_datetime: toLocalInput(appt.start_datetime),
+      end_datetime: toLocalInput(appt.end_datetime),
       reason: appt.reason,
     });
     setIsModalOpen(true);
   };
 
   const onSubmit = async (data: AppointmentCreate) => {
+    const start = new Date(data.start_datetime).getTime();
+    const end = new Date(data.end_datetime).getTime();
+    if (isNaN(start) || isNaN(end) || end <= start) {
+      toast.error('La fecha/hora de fin debe ser posterior al inicio');
+      return;
+    }
+    if (hasDoctorConflict(data.start_datetime, data.end_datetime, data.doctor_id)) {
+      toast.error('El médico ya tiene una cita en ese horario');
+      return;
+    }
     try {
+      const payload = {
+        patient_id: Number(data.patient_id),
+        doctor_id: Number(data.doctor_id),
+        start_datetime: new Date(data.start_datetime).toISOString(),
+        end_datetime: new Date(data.end_datetime).toISOString(),
+        reason: data.reason,
+      };
       if (editingAppointment) {
-        await appointmentApi.update(editingAppointment.id, data);
+        await appointmentApi.update(editingAppointment.id, payload);
         toast.success('Cita actualizada correctamente');
       } else {
-        await appointmentApi.create(data);
+        await appointmentApi.create(payload);
         toast.success('Cita programada correctamente');
       }
       setIsModalOpen(false);
       loadData();
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Error al guardar la cita');
+      toast.error(error.response?.data?.detail?.message || error.response?.data?.detail || 'Error al guardar la cita');
     }
   };
 
@@ -100,14 +152,14 @@ const AppointmentsPage: React.FC = () => {
       toast.success('Cita eliminada correctamente');
       loadData();
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Error al eliminar la cita');
+      toast.error(error.response?.data?.detail?.message || error.response?.data?.detail || 'Error al eliminar la cita');
     }
   };
 
   const filtered = appointments.filter(
     (a) =>
-      (a.patient_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (a.doctor_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patientName(a.patient_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doctorName(a.doctor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
       (a.reason || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -115,13 +167,13 @@ const AppointmentsPage: React.FC = () => {
     {
       header: 'Paciente',
       accessor: (a: Appointment) => (
-        <span className="font-medium text-medical-textMain">{a.patient_name || 'Desconocido'}</span>
+        <span className="font-medium text-medical-textMain">{patientName(a.patient_id)}</span>
       )
     },
     {
       header: 'Doctor',
       accessor: (a: Appointment) => (
-        <span className="text-slate-600">{a.doctor_name || 'Sin asignar'}</span>
+        <span className="text-slate-600">{doctorName(a.doctor_id)}</span>
       )
     },
     {
@@ -129,14 +181,14 @@ const AppointmentsPage: React.FC = () => {
       accessor: (a: Appointment) => (
         <div className="flex items-center gap-2 text-slate-600">
           <CalendarIcon size={14} />
-          {a.appointment_date ? new Date(a.appointment_date).toLocaleString() : '-'}
+          {a.start_datetime ? new Date(a.start_datetime).toLocaleString() : '-'}
         </div>
       )
     },
     {
       header: 'Estado',
       accessor: (a: Appointment) => {
-        const status = a.status_name || 'DESCONOCIDO';
+        const status = a.status?.code || statuses.find((s) => s.id === a.status_id)?.code || 'DESCONOCIDO';
         const colorClass = statusColors[status.toUpperCase()] || 'bg-slate-100 text-slate-600 border-slate-200';
         return (
           <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${colorClass}`}>
@@ -206,7 +258,10 @@ const AppointmentsPage: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-medical-textMain mb-1">Paciente *</label>
               <select
-                {...register('patient_id', { required: 'Paciente requerido', valueAsNumber: true })}
+                {...register('patient_id', {
+                  required: 'Paciente requerido',
+                  setValueAs: (v) => (v === '' || v === null ? undefined : Number(v))
+                })}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
               >
                 <option value="">Seleccionar paciente...</option>
@@ -219,7 +274,10 @@ const AppointmentsPage: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-medical-textMain mb-1">Doctor *</label>
               <select
-                {...register('doctor_id', { required: 'Doctor requerido', valueAsNumber: true })}
+                {...register('doctor_id', {
+                  required: 'Doctor requerido',
+                  setValueAs: (v) => (v === '' || v === null ? undefined : Number(v))
+                })}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
               >
                 <option value="">Seleccionar doctor...</option>
@@ -233,26 +291,34 @@ const AppointmentsPage: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-medical-textMain mb-1">Fecha y Hora *</label>
+              <label className="block text-sm font-medium text-medical-textMain mb-1">Inicio *</label>
               <input
                 type="datetime-local"
-                {...register('appointment_date', { required: 'Fecha requerida' })}
+                {...register('start_datetime', {
+                  required: 'Fecha de inicio requerida',
+                  validate: (value) =>
+                    hasDoctorConflict(value, getValues('end_datetime'), getValues('doctor_id'))
+                      ? 'El médico ya tiene una cita en ese horario'
+                      : true
+                })}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
               />
-              {errors.appointment_date && <p className="text-red-500 text-xs mt-1">{errors.appointment_date.message}</p>}
+              {errors.start_datetime && <p className="text-red-500 text-xs mt-1">{errors.start_datetime.message}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-medical-textMain mb-1">Estado *</label>
-              <select
-                {...register('status_id', { required: 'Estado requerido', valueAsNumber: true })}
+              <label className="block text-sm font-medium text-medical-textMain mb-1">Fin *</label>
+              <input
+                type="datetime-local"
+                {...register('end_datetime', {
+                  required: 'Fecha de fin requerida',
+                  validate: (value) =>
+                    hasDoctorConflict(getValues('start_datetime'), value, getValues('doctor_id'))
+                      ? 'El médico ya tiene una cita en ese horario'
+                      : true
+                })}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
-              >
-                <option value="">Seleccionar estado...</option>
-                {statuses.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-              {errors.status_id && <p className="text-red-500 text-xs mt-1">{errors.status_id.message}</p>}
+              />
+              {errors.end_datetime && <p className="text-red-500 text-xs mt-1">{errors.end_datetime.message}</p>}
             </div>
           </div>
 

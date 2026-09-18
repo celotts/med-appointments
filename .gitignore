@@ -20,4 +20,13 @@ htmlcov/
 .DS_Store
 .idea/
 .vscode/
-/front/.vite/
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# El lockfile SÍ se versiona (necesario para builds reproducibles y `npm ci`)
+!package-lock.json
+!front/package-lock.json

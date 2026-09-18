@@ -72,7 +72,7 @@ async def create_appointment(
         raise i18n.error("doctor_not_found", status_code=404)
     try:
         return await crud_appointment.create_appointment(
-            db, appointment_in=appointment_in, user_id=current_user.id
+            db, appointment=appointment_in, user_id=current_user.id
         )
     except ValueError as exc:
         if "at that time" in str(exc):

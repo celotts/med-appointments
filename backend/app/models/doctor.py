@@ -25,6 +25,9 @@ class Doctor(Base):
     )
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    document_number: Mapped[str] = mapped_column(
+        String(50), unique=True, nullable=False
+    )
     professional_license: Mapped[str] = mapped_column(
         String(50), unique=True, nullable=False
     )

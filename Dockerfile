@@ -1,7 +1,7 @@
 # ==========================================
 # ETAPA 1: Builder (Compilación de ruedas/wheels)
 # ==========================================
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.12-slim-trixie AS builder
 
 WORKDIR /app
 
@@ -13,10 +13,14 @@ RUN apt-get update && apt-get upgrade -y && \
     rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt .
+COPY backend/requirements-dev.txt .
 
 # Compilar todas las librerías a formato wheel para no necesitar gcc en la imagen final
 RUN pip install --no-cache-dir --upgrade pip && \
     pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
+
+# Dependencias de pruebas (pytest) para certificar el desarrollo con `make test`
+RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements-dev.txt
 
 # ==========================================
 # ETAPA 2: Imagen Final (Ejecución Limpia)
@@ -40,6 +44,10 @@ RUN pip install --no-cache-dir --no-index --find-links=/wheels /wheels/*
 
 # Copiar el código fuente asegurando que quede dentro de la carpeta app
 COPY backend/app /app/app
+
+# Configuración de pytest y suite de pruebas para `make test`
+COPY backend/pytest.ini /app/pytest.ini
+COPY backend/tests /app/tests
 
 # Usuario de sistema (comentado por problemas de construcción en algunos entornos)
 # RUN addgroup -S appgroup && adduser -S -G appgroup appuser

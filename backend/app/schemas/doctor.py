@@ -7,6 +7,7 @@ class DoctorBase(BaseModel):
     specialty_id: int
     first_name: str
     last_name: str
+    document_number: str
     professional_license: str
     email: EmailStr
     phone: str | None = None
@@ -20,6 +21,7 @@ class DoctorUpdate(BaseModel):
     specialty_id: int | None = None
     first_name: str | None = None
     last_name: str | None = None
+    document_number: str | None = None
     professional_license: str | None = None
     email: EmailStr | None = None
     phone: str | None = None

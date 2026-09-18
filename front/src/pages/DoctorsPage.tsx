@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { doctorApi, Doctor, DoctorCreate } from '../api/doctorApi';
+import { specialtyApi, Specialty } from '../api/specialtyApi';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
 import { Plus, Search, Loader2 } from 'lucide-react';
@@ -8,6 +9,7 @@ import { toast } from 'react-hot-toast';
 
 const DoctorsPage: React.FC = () => {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [specialties, setSpecialties] = useState<Specialty[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState<Doctor | null>(null);
@@ -17,8 +19,12 @@ const DoctorsPage: React.FC = () => {
   const loadDoctors = async () => {
     try {
       setIsLoading(true);
-      const data = await doctorApi.getAll();
+      const [data, specs] = await Promise.all([
+        doctorApi.getAll(),
+        specialtyApi.getAll(),
+      ]);
       setDoctors(Array.isArray(data) ? data : []);
+      setSpecialties(Array.isArray(specs) ? specs : []);
     } catch (error) {
       toast.error('Error al cargar doctores');
     } finally {
@@ -30,7 +36,7 @@ const DoctorsPage: React.FC = () => {
 
   const openCreate = () => {
     setEditingDoctor(null);
-    reset({ first_name: '', last_name: '', email: '', phone: '', license_number: '', specialty_id: 0 });
+    reset({ first_name: '', last_name: '', document_number: '', email: '', phone: '', professional_license: '', specialty_id: 0 });
     setIsModalOpen(true);
   };
 
@@ -39,9 +45,10 @@ const DoctorsPage: React.FC = () => {
     reset({
       first_name: doctor.first_name,
       last_name: doctor.last_name,
+      document_number: doctor.document_number,
       email: doctor.email,
-      phone: doctor.phone,
-      license_number: doctor.license_number,
+      phone: doctor.phone || '',
+      professional_license: doctor.professional_license,
       specialty_id: doctor.specialty_id,
     });
     setIsModalOpen(true);
@@ -83,10 +90,11 @@ const DoctorsPage: React.FC = () => {
 
   const columns = [
     { header: 'Nombre', accessor: (d: Doctor) => `Dr. ${d.first_name} ${d.last_name}` },
+    { header: 'Documento', accessor: 'document_number' as const },
     { header: 'Email', accessor: 'email' as const },
-    { header: 'Telefono', accessor: 'phone' as const },
-    { header: 'Licencia', accessor: 'license_number' as const },
-    { header: 'Especialidad', accessor: (d: Doctor) => d.specialty_name || '-' },
+    { header: 'Telefono', accessor: (d: Doctor) => d.phone || '-' },
+    { header: 'Licencia', accessor: 'professional_license' as const },
+    { header: 'Especialidad', accessor: (d: Doctor) => specialties.find((s) => s.id === d.specialty_id)?.name || '-' },
   ];
 
   return (
@@ -156,23 +164,51 @@ const DoctorsPage: React.FC = () => {
               {errors.last_name && <p className="text-red-500 text-xs mt-1">{errors.last_name.message}</p>}
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-medical-textMain mb-1">Email *</label>
-            <input
-              type="email"
-              {...register('email', {
-                required: 'Email requerido',
-                pattern: { value: /^\S+@\S+$/i, message: 'Email inválido' }
-              })}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
-            />
-            {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-medical-textMain mb-1">No. Documento *</label>
+              <input
+                {...register('document_number', {
+                  required: 'El documento es requerido',
+                  validate: (value) =>
+                    doctors.some(
+                      (d) =>
+                        d.document_number.toLowerCase() === value.trim().toLowerCase() &&
+                        d.id !== editingDoctor?.id
+                    )
+                      ? 'Ya existe un médico con este número de documento'
+                      : true
+                })}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
+              />
+              {errors.document_number && <p className="text-red-500 text-xs mt-1">{errors.document_number.message}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-medical-textMain mb-1">Email *</label>
+              <input
+                type="email"
+                {...register('email', {
+                  required: 'Email requerido',
+                  pattern: { value: /^\S+@\S+$/i, message: 'Email inválido' },
+                  validate: (value) =>
+                    doctors.some(
+                      (d) =>
+                        d.email.toLowerCase() === value.trim().toLowerCase() &&
+                        d.id !== editingDoctor?.id
+                    )
+                      ? 'Ya existe un médico con este email'
+                      : true
+                })}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
+              />
+              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-medical-textMain mb-1">Teléfono *</label>
+              <label className="block text-sm font-medium text-medical-textMain mb-1">Teléfono</label>
               <input
-                {...register('phone', { required: 'Teléfono requerido' })}
+                {...register('phone')}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
               />
               {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone.message}</p>}
@@ -180,19 +216,36 @@ const DoctorsPage: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-medical-textMain mb-1">No. Licencia *</label>
               <input
-                {...register('license_number', { required: 'Licencia requerida' })}
+                {...register('professional_license', {
+                  required: 'Licencia requerida',
+                  validate: (value) =>
+                    doctors.some(
+                      (d) =>
+                        d.professional_license.toLowerCase() === value.trim().toLowerCase() &&
+                        d.id !== editingDoctor?.id
+                    )
+                      ? 'Ya existe un médico con esta licencia'
+                      : true
+                })}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
               />
-              {errors.license_number && <p className="text-red-500 text-xs mt-1">{errors.license_number.message}</p>}
+              {errors.professional_license && <p className="text-red-500 text-xs mt-1">{errors.professional_license.message}</p>}
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-medical-textMain mb-1">ID Especialidad *</label>
-            <input
-              type="number"
-              {...register('specialty_id', { required: 'Especialidad requerida', valueAsNumber: true })}
+            <label className="block text-sm font-medium text-medical-textMain mb-1">Especialidad *</label>
+            <select
+              {...register('specialty_id', {
+                required: 'Especialidad requerida',
+                setValueAs: (v) => (v === '' || v === null ? undefined : Number(v))
+              })}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
-            />
+            >
+              <option value="">Seleccionar especialidad...</option>
+              {specialties.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
             {errors.specialty_id && <p className="text-red-500 text-xs mt-1">{errors.specialty_id.message}</p>}
           </div>
           <div className="pt-4 flex justify-end gap-3">

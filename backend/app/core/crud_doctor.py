@@ -11,6 +11,15 @@ async def get_doctor(db: AsyncSession, doctor_id: int) -> DoctorModel | None:
     return result.scalars().first()
 
 
+async def get_doctor_by_document(
+    db: AsyncSession, document_number: str
+) -> DoctorModel | None:
+    result = await db.execute(
+        select(DoctorModel).filter(DoctorModel.document_number == document_number)
+    )
+    return result.scalars().first()
+
+
 async def get_doctors(
     db: AsyncSession, skip: int = 0, limit: int = 100
 ) -> list[DoctorModel]:

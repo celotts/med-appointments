@@ -4,6 +4,7 @@ export interface Patient {
   id: number;
   first_name: string;
   last_name: string;
+  document_number: string;
   birth_date: string;
   email: string;
   phone: string;
@@ -13,6 +14,7 @@ export interface Patient {
 export interface PatientCreate {
   first_name: string;
   last_name: string;
+  document_number: string;
   birth_date: string;
   email: string;
   phone: string;

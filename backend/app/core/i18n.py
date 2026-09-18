@@ -24,6 +24,7 @@ TRANSLATIONS = {
         "doctor_deleted": "Doctor deleted successfully",
         "doctor_not_found": "Doctor not found",
         "doctor_already_exists": "Doctor with this license already exists",
+        "document_already_exists": "A record with this document number already exists",
         # Specialties
         "specialty_created": "Specialty created successfully",
         "specialty_updated": "Specialty updated successfully",
@@ -99,6 +100,7 @@ TRANSLATIONS = {
         "doctor_deleted": "Médico eliminado exitosamente",
         "doctor_not_found": "Médico no encontrado",
         "doctor_already_exists": "Ya existe un médico con esta cédula",
+        "document_already_exists": "Ya existe un registro con este número de documento",
         # Specialties
         "specialty_created": "Especialidad creada exitosamente",
         "specialty_updated": "Especialidad actualizada exitosamente",
@@ -174,6 +176,7 @@ TRANSLATIONS = {
         "doctor_deleted": "Médico excluído com sucesso",
         "doctor_not_found": "Médico não encontrado",
         "doctor_already_exists": "Já existe um médico com esta licença",
+        "document_already_exists": "Já existe um registro com este número de documento",
         # Specialties
         "specialty_created": "Especialidade criada com sucesso",
         "specialty_updated": "Especialidade atualizada com sucesso",

@@ -37,6 +37,7 @@ const PatientsPage: React.FC = () => {
     reset({
       first_name: '',
       last_name: '',
+      document_number: '',
       birth_date: '',
       email: '',
       phone: ''
@@ -49,6 +50,7 @@ const PatientsPage: React.FC = () => {
     reset({
       first_name: patient.first_name,
       last_name: patient.last_name,
+      document_number: patient.document_number,
       birth_date: patient.birth_date,
       email: patient.email,
       phone: patient.phone,
@@ -92,6 +94,7 @@ const PatientsPage: React.FC = () => {
 
   const columns = [
     { header: 'Nombre Completo', accessor: (p: Patient) => `${p.first_name} ${p.last_name}` },
+    { header: 'Documento', accessor: 'document_number' as const },
     { header: 'Email', accessor: 'email' as const },
     { header: 'Teléfono', accessor: 'phone' as const },
     { header: 'Fecha Nac.', accessor: 'birth_date' as const },
@@ -183,14 +186,11 @@ const PatientsPage: React.FC = () => {
               <label className="block text-sm font-medium text-medical-textMain mb-1">Fecha de Nacimiento *</label>
               <input
                 type="date"
-                required={true}
+                {...register('birth_date', { required: 'La fecha de nacimiento es requerida' })}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
-                value={editingPatient ? editingPatient.birth_date : ''}
-                onChange={(e) => {
-                  setEditingPatient(prev => prev ? { ...prev, birth_date: e.target.value } : null);
-                }}
               />
-              
+              {errors.birth_date && <p className="text-red-500 text-xs mt-1">{errors.birth_date.message}</p>}
+
             </div>
             <div>
               <label className="block text-sm font-medium text-medical-textMain mb-1">Teléfono *</label>

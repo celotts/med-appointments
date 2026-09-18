@@ -2,9 +2,16 @@
 # Compatible con: make up, make up-prueba, make down, make start, make logs, make ps, make clean, make shell, make lint, make format, make seed
 
 # ----- OPCIÓN DOCKER -----
-# Levanta contenedores usando Docker Compose
+# Levanta contenedores usando Docker Compose (SIN rebuild, usa imagen cached)
+# Esta es la opción recomendada para levantar la aplicación rápidamente
 up:
-	@echo "Levantando contenedores con Docker..."
+	@echo "Levantando contenedores con Docker (imagen cached)..."
+	docker compose up -d
+
+# Levanta con rebuild forzado (solo si es absolutamente necesario)
+# Nota: El build frontal falla en macOS ARM64 por incompatibilidades Node.js/Tailwind
+up-build:
+	@echo "Levantando contenedores con rebuild..."
 	docker compose up -d --build
 
 # Detiene y limpia usando Docker
@@ -19,12 +26,12 @@ start: down up
 
 # Logs usando Docker
 logs:
-	@echo "Mostrando logs con Docker..."
+	@echo "Mostrando los logs de los contenedores..."
 	docker compose logs -f
 
 # Estado usando Docker
 ps:
-	@echo "Listando contenedores con Docker..."
+	@echo "Listando los contenedores..."
 	docker compose ps
 
 # Limpieza completa usando Docker
@@ -34,17 +41,17 @@ clean: down
 
 # Shell usando Docker
 shell:
-	@echo "Shell en contenedor API (Docker)..."
+	@echo "Iniciando shell en el contenedor medical_rag_api..."
 	docker compose exec medical-rag-api /bin/sh
 
 # Linter usando Docker
 lint:
-	@echo "Linter con flake8 (Docker)..."
+	@echo "Ejecutando linter (flake8)..."
 	docker compose exec medical-rag-api flake8 backend
 
 # Formatear usando Docker
 format:
-	@echo "Formateando con black e isort (Docker)..."
+	@echo "Formateando el código con black y isort..."
 	docker compose exec medical-rag-api black backend
 	docker compose exec medical-rag-api isort backend
 
@@ -52,19 +59,56 @@ format:
 seed:
 	@./scripts/seed.sh
 
+# Ejecuta TODAS las pruebas de certificación (backend + front)
+test: test-back test-front
+
+# Pruebas de contrato del API (pytest) dentro del contenedor
+test-back:
+	@echo "==> Backend: pytest en medical_rag_api..."
+	docker compose exec -T -w /app medical-rag-api python -m pytest -q
+
+# Typecheck del front (tsc --noEmit) en un contenedor Node 20 aislado
+test-front:
+	@echo "==> Front: typecheck (tsc) con Node 20..."
+	docker run --rm \
+		-v "$(CURDIR)/front":/app \
+		-v med_front_node_modules:/app/node_modules \
+		-w /app node:20-alpine \
+		sh -c "npm ci --no-audit --no-fund --silent && npm run typecheck"
+
+# Ejecuta TODAS las pruebas con Podman
+test-podman: test-back-podman test-front-podman
+
+test-back-podman:
+	@echo "==> Backend: pytest con Podman..."
+	podman-compose exec -T -w /app medical-rag-api python -m pytest -q
+
+test-front-podman:
+	@echo "==> Front: typecheck (tsc) con Podman y Node 20..."
+	podman run --rm \
+		-v "$(CURDIR)/front":/app \
+		-v med_front_node_modules:/app/node_modules \
+		-w /app node:20-alpine \
+		sh -c "npm ci --no-audit --no-fund --silent && npm run typecheck"
+
 # Ayuda específica Docker
 docker-help:
 	@echo "--- Comandos Docker ---"
-	@echo "  make up              - Levanta con Docker"
+	@echo "  make up              - Levanta con Docker (imagen cached)"
+	@echo "  make up-build        - Levantar con rebuild (puede fallar)"
 	@echo "  make down            - Detiene con Docker"
-	@echo "  make start           - Reinicia con Docker"
-	@echo "  make logs            - Logs con Docker"
-	@echo "  make ps              - Estado con Docker"
+	@echo "  make start           - Reinicia desde cero"
+	@echo "  make logs            - Ver logs en tiempo real"
+	@echo "  make ps              - Ver estado de contenedores"
 	@echo "  make clean           - Limpieza con Docker"
 	@echo "  make shell           - Shell con Docker"
 	@echo "  make lint            - Linter con Docker"
 	@echo "  make format          - Formateo con Docker"
 	@echo "  make seed            - Datos de prueba"
+	@echo "  make test            - Pruebas: pytest (API) + typecheck (front)"
+	@echo "  make test-back       - Solo pytest del API"
+	@echo "  make test-front      - Solo typecheck del front (tsc)"
+	@echo "  make test-podman     - Pruebas con Podman"
 
 # ----- OPCIÓN PODMAN -----
 # Levanta contenedores usando Podman Compose
@@ -84,12 +128,12 @@ start-podman: down-podman up-podman
 
 # Logs usando Podman
 logs-podman:
-	@echo "Mostrando logs con Podman..."
+	@echo "Mostrando los logs con Podman..."
 	podan-compose logs -f
 
 # Estado usando Podman
 ps-podman:
-	@echo "Listando contenedores con Podman..."
+	@echo "Listando los contenedores con Podman..."
 	podan-compose ps
 
 # Limpieza completa usando Podman
@@ -105,13 +149,13 @@ shell-podman:
 # Linter usando Podman
 lint-podman:
 	@echo "Linter con flake8 (Podman)..."
-	podan-compose exec medical-rag-api flake8 backend
+	podal-compose exec medical-rag-api flake8 backend
 
 # Formatear usando Podman
 format-podman:
 	@echo "Formateando con black e isort (Podman)..."
-	podan-compose exec medical-rag-api black backend
-	podan-compose exec medical-rag-api isort backend
+	podal-compose exec medical-rag-api black backend
+	podal-compose exec medical-rag-api isort backend
 
 # Datos de prueba (mismo script)
 seed-podman:
@@ -120,9 +164,9 @@ seed-podman:
 # Ayuda específica Podman
 podman-help:
 	@echo "--- Comandos Podman ---"
-	@echo "  make up-podman       - Levanta con Podman"
-	@echo "  make down-podman     - Detiene con Podman"
-	@echo "  make start-podman    - Reinicia con Podman"
+	@echo "  make up-podman       - Levantar con Podman"
+	@echo "  make down-podman     - Detener con Podman"
+	@echo "  make start-podman    - Reiniciar con Podman"
 	@echo "  make logs-podman     - Logs con Podman"
 	@echo "  make ps-podman       - Estado con Podman"
 	@echo "  make clean-podman    - Limpieza con Podman"
@@ -135,8 +179,9 @@ podman-help:
 help:
 	@echo "=== Makefile: Gestión de Contenedores ==="
 	@echo ""
-	@echo "--- Por defecto (Docker) ---"
-	@echo "  make up              - Levanta contenedores"
+	@echo "--- Por defecto (Docker, imagen cached) ---"
+	@echo "  make up              - Levanta contenedores (recomendado)"
+	@echo "  make up-build        - Levantar con rebuild (puede fallar)"
 	@echo "  make down            - Detiene y limpia"
 	@echo "  make start           - Reinicia desde cero"
 	@echo "  make logs            - Ver logs en tiempo real"
@@ -146,6 +191,7 @@ help:
 	@echo "  make lint            - Ejecutar flake8"
 	@echo "  make format          - Formatear código (black + isort)"
 	@echo "  make seed            - Cargar datos de prueba"
+	@echo "  make test            - Pruebas: pytest (API) + typecheck (front)"
 	@echo ""
 	@echo "--- Podman (explicito) ---"
 	@echo "  make up-podman       - Levantar con Podman"
@@ -156,7 +202,7 @@ help:
 	@echo "  make clean-podman    - Limpiar sistema con Podman"
 	@echo "  make shell-podman    - Shell en API con Podman"
 	@echo "  make lint-podman     - Linter con flake8 (Podman)"
-	@echo "  make format-podman   - Formatear con black/isort (Podman)"
+	@echo "  make format-podman   - Formateo con black/isort (Podman)"
 	@echo "  make seed-podman     - Cargar datos de prueba"
 	@echo ""
 	@echo "  make docker-help     - Ver solo comandos Docker"

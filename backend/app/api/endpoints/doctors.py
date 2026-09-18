@@ -60,6 +60,8 @@ async def create_doctor(
     """Creates a new doctor."""
     i18n = I18nResponse(language)
     await _ensure_specialty(db, doctor_in.specialty_id, i18n)
+    if await crud_doctor.get_doctor_by_document(db, doctor_in.document_number):
+        raise i18n.error("document_already_exists", status_code=400)
     try:
         return await crud_doctor.create_doctor(db, doctor=doctor_in)
     except IntegrityError as exc:
@@ -107,6 +109,15 @@ async def update_doctor(
         raise i18n.error("doctor_not_found", status_code=404)
     if doctor_in.specialty_id is not None:
         await _ensure_specialty(db, doctor_in.specialty_id, i18n)
+    if (
+        doctor_in.document_number is not None
+        and doctor_in.document_number != db_doctor.document_number
+    ):
+        existing = await crud_doctor.get_doctor_by_document(
+            db, doctor_in.document_number
+        )
+        if existing and existing.id != db_doctor.id:
+            raise i18n.error("document_already_exists", status_code=400)
     try:
         return await crud_doctor.update_doctor(
             db, db_doctor=db_doctor, doctor=doctor_in

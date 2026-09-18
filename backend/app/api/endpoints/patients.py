@@ -44,6 +44,8 @@ async def create_patient(
 ) -> Patient:
     """Creates a new patient."""
     i18n = I18nResponse(language)
+    if await crud_patient.get_patient_by_document(db, patient_in.document_number):
+        raise i18n.error("document_already_exists", status_code=400)
     try:
         return await crud_patient.create_patient(db, patient=patient_in)
     except IntegrityError as exc:
@@ -89,6 +91,15 @@ async def update_patient(
     db_patient = await crud_patient.get_patient(db, patient_id=patient_id)
     if not db_patient:
         raise i18n.error("patient_not_found", status_code=404)
+    if (
+        patient_in.document_number is not None
+        and patient_in.document_number != db_patient.document_number
+    ):
+        existing = await crud_patient.get_patient_by_document(
+            db, patient_in.document_number
+        )
+        if existing and existing.id != db_patient.id:
+            raise i18n.error("document_already_exists", status_code=400)
     try:
         return await crud_patient.update_patient(
             db, db_patient=db_patient, patient=patient_in
