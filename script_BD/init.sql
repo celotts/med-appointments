@@ -230,6 +230,23 @@ INSERT INTO roles (id, name, created_by_user_id)
 VALUES ('00000000-0000-0000-0000-000000000002', 'SUPER_ADMIN', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
 
 
+-- Catálogos base (necesarios para crear citas y médicos)
+INSERT INTO appointment_statuses (code, description) VALUES
+    ('PENDIENTE', 'Cita pendiente'),
+    ('CONFIRMADA', 'Cita confirmada'),
+    ('COMPLETADA', 'Cita completada'),
+    ('CANCELADA', 'Cita cancelada'),
+    ('SUSPENDIDA', 'Cita suspendida'),
+    ('REAGENDADA', 'Cita reagendada')
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO specialties (name, description) VALUES
+    ('Medicina General', 'Atención primaria'),
+    ('Cardiología', 'Especialidad del corazón'),
+    ('Pediatría', 'Atención de niños y adolescentes')
+ON CONFLICT (name) DO NOTHING;
+
+
 -- ============================================================================
 -- PERFORMANCE INDEXES
 -- ============================================================================
