@@ -171,7 +171,17 @@ const PatientsPage: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-medical-textMain mb-1">Documento *</label>
             <input
-              {...register('document_number', { required: 'El documento es requerido' })}
+              {...register('document_number', {
+                required: 'El documento es requerido',
+                validate: (value) =>
+                  patients.some(
+                    (p) =>
+                      p.document_number.toLowerCase() === value.trim().toLowerCase() &&
+                      p.id !== editingPatient?.id
+                  )
+                    ? 'Ya existe un paciente con este número de documento'
+                    : true
+              })}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
             />
             {errors.document_number && <p className="text-red-500 text-xs mt-1">{errors.document_number.message}</p>}
@@ -183,7 +193,15 @@ const PatientsPage: React.FC = () => {
               type="email"
               {...register('email', {
                 required: 'El email es requerido',
-                pattern: { value: /^\S+@\S+$/i, message: 'Email inválido' }
+                pattern: { value: /^\S+@\S+$/i, message: 'Email inválido' },
+                validate: (value) =>
+                  patients.some(
+                    (p) =>
+                      p.email.toLowerCase() === value.trim().toLowerCase() &&
+                      p.id !== editingPatient?.id
+                  )
+                    ? 'Ya existe un paciente con este email'
+                    : true
               })}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
             />

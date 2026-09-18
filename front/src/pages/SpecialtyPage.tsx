@@ -132,7 +132,17 @@ const SpecialtyPage: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-medical-textMain mb-1">Nombre *</label>
             <input
-              {...register('name', { required: 'El nombre es requerido' })}
+              {...register('name', {
+                required: 'El nombre es requerido',
+                validate: (value) =>
+                  specialties.some(
+                    (s) =>
+                      s.name.toLowerCase() === value.trim().toLowerCase() &&
+                      s.id !== editingSpecialty?.id
+                  )
+                    ? 'Ya existe una especialidad con este nombre'
+                    : true
+              })}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
             />
             {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
