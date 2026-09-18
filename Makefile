@@ -1,5 +1,28 @@
 # Makefile para gestionar contenedores - Opciones para Docker y Podman
-# Compatible con: make up, make up-prueba, make down, make start, make logs, make ps, make clean, make shell, make lint, make format, make seed
+# Compatible con: make containers, make up, make down, make start, make logs, make ps, make clean, make shell, make lint, make format, make seed
+
+# ----- SELECTOR INTERACTIVO (Docker / Podman) -----
+# Pregunta el motor y la acción, y ejecuta el comando correspondiente
+containers:
+	@printf "\n=== ¿Con qué motor? ===\n"; \
+	printf "  1) Docker\n  2) Podman\n"; \
+	printf "Opción [1]: "; read motor; \
+	printf "\n=== ¿Qué acción? ===\n"; \
+	printf "  1) Levantar\n  2) Bajar\n"; \
+	printf "Opción [1]: "; read accion; \
+	[ -z "$$motor" ] && motor=1; \
+	[ -z "$$accion" ] && accion=1; \
+	if [ "$$motor" = "2" ]; then engine="Podman"; compose="podman-compose"; else engine="Docker"; compose="docker compose"; fi; \
+	if [ "$$accion" = "2" ]; then \
+		printf "\n==> Bajando contenedores con %s...\n" "$$engine"; \
+		$$compose down -v; \
+	else \
+		printf "\n==> Levantando contenedores con %s...\n" "$$engine"; \
+		$$compose up -d; \
+	fi
+
+# Alias de `containers`
+choose: containers
 
 # ----- OPCIÓN DOCKER -----
 # Levanta contenedores usando Docker Compose (SIN rebuild, usa imagen cached)
@@ -180,6 +203,7 @@ help:
 	@echo "=== Makefile: Gestión de Contenedores ==="
 	@echo ""
 	@echo "--- Por defecto (Docker, imagen cached) ---"
+	@echo "  make containers      - Selector interactivo Docker/Podman (levantar/bajar)"
 	@echo "  make up              - Levanta contenedores (recomendado)"
 	@echo "  make up-build        - Levantar con rebuild (puede fallar)"
 	@echo "  make down            - Detiene y limpia"
