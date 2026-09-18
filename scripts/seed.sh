@@ -1,62 +1,36 @@
 #!/bin/bash
-# Seed script para datos de prueba
+# Carga los datos de prueba (catálogos + datos de ejemplo) en la BD.
+# Uso:  ./scripts/seed.sh [docker|podman]   (por defecto: docker)
+# Equivale a:  make seed            (Docker)
+#              make seed-podman     (Podman)
 
-echo "Esperando a que PostgreSQL esté listo..."
-until podman exec medical_pgvector pg_isready -U root -d appointment >/dev/null 2>&1; do
+set -e
+
+ENGINE="${1:-docker}"
+PG_CONTAINER="${PG_CONTAINER:-medical_pgvector}"
+PG_USER="${PG_USER:-postgres}"
+PG_DB="${PG_DB:-appointment}"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+echo "Motor: $ENGINE. Esperando a que PostgreSQL esté listo..."
+until "$ENGINE" exec "$PG_CONTAINER" pg_isready -U "$PG_USER" -d "$PG_DB" >/dev/null 2>&1; do
   sleep 1
 done
 
-echo "Insertando datos de prueba..."
+echo "Esperando al superusuario admin@medapp.com..."
+for _ in $(seq 1 60); do
+  if [ "$("$ENGINE" exec "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -tAc "SELECT 1 FROM users WHERE email='admin@medapp.com'" 2>/dev/null | tr -d '[:space:]')" = "1" ]; then
+    break
+  fi
+  sleep 1
+done
 
-podman exec medical_pgvector psql -U root -d appointment << 'EOF'
--- Specialties
-INSERT INTO specialties (name, description) VALUES 
-('Cardiología', 'Especialidad del corazón'),
-('Medicina General', 'Atención primaria'),
-('Neurología', 'Sistema nervioso')
-ON CONFLICT DO NOTHING;
+echo "Cargando catálogos..."
+"$ENGINE" exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -v ON_ERROR_STOP=1 \
+  < "$DIR/script_BD/seeds/seed_catalogs.sql"
 
--- Doctors
-INSERT INTO doctors (specialty_id, first_name, last_name, professional_license, email, phone) VALUES 
-(1, 'María', 'García', 'LIC-001', 'maria.garcia@clinic.com', '555-1001'),
-(2, 'Carlos', 'López', 'LIC-002', 'carlos.lopez@clinic.com', '555-1002')
-ON CONFLICT DO NOTHING;
+echo "Cargando datos de ejemplo..."
+"$ENGINE" exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -v ON_ERROR_STOP=1 \
+  < "$DIR/script_BD/seeds/seed_sample.sql"
 
--- Patients
-INSERT INTO patients (first_name, last_name, birth_date, email, phone) VALUES 
-('Juan', 'Pérez', '1985-03-15', 'juan.perez@email.com', '555-2001'),
-('Ana', 'Martínez', '1990-07-22', 'ana.martinez@email.com', '555-2002')
-ON CONFLICT DO NOTHING;
-
--- Appointment Statuses
-INSERT INTO appointment_statuses (code, description) VALUES 
-('PROGRAMADA', 'Cita programada'),
-('CONFIRMADA', 'Cita confirmada'),
-('EN_PROGRESO', 'En progreso'),
-('COMPLETADA', 'Completada'),
-('CANCELADA', 'Cancelada')
-ON CONFLICT DO NOTHING;
-
--- Appointments
-INSERT INTO appointments (patient_id, doctor_id, status_id, start_datetime, end_datetime, reason) VALUES 
-(1, 1, 1, '2026-09-10 10:00:00', '2026-09-10 10:30:00', 'Control cardiológico'),
-(2, 2, 1, '2026-09-10 11:00:00', '2026-09-10 11:30:00', 'Consulta general')
-ON CONFLICT DO NOTHING;
-
--- Waitlist table
-CREATE TABLE IF NOT EXISTS waitlist (
-    id SERIAL PRIMARY KEY,
-    patient_id INT NOT NULL,
-    doctor_id INT NOT NULL,
-    fecha_preferida DATE NOT NULL,
-    motivo TEXT,
-    estado VARCHAR(20) DEFAULT 'PENDIENTE',
-    created_at TIMESTAMP DEFAULT NOW(),
-    notified_at TIMESTAMP,
-    CONSTRAINT fk_waitlist_patient FOREIGN KEY (patient_id) REFERENCES patients (id) ON DELETE CASCADE,
-    CONSTRAINT fk_waitlist_doctor FOREIGN KEY (doctor_id) REFERENCES doctors (id) ON DELETE CASCADE
-);
-
-EOF
-
-echo "Datos de prueba insertados."
+echo "Datos de prueba cargados."

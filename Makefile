@@ -1,5 +1,5 @@
 # Makefile para gestionar contenedores - Opciones para Docker y Podman
-# Compatible con: make containers, make up, make down, make start, make logs, make ps, make clean, make shell, make lint, make format, make seed
+# Compatible con: make containers, make up, make up-test, make down, make start, make logs, make ps, make clean, make shell, make lint, make format, make seed
 
 # ----- SELECTOR INTERACTIVO (Docker / Podman) -----
 # Pregunta el motor y la acción, y ejecuta el comando correspondiente
@@ -12,21 +12,23 @@ containers:
 	printf "Opción [1]: "; read accion; \
 	[ -z "$$motor" ] && motor=1; \
 	[ -z "$$accion" ] && accion=1; \
-	if [ "$$motor" = "2" ]; then engine="Podman"; compose="podman-compose"; else engine="Docker"; compose="docker compose"; fi; \
+	if [ "$$motor" = "2" ]; then engine="Podman"; compose="podman-compose"; cli="podman"; else engine="Docker"; compose="docker compose"; cli="docker"; fi; \
 	if [ "$$accion" = "2" ]; then \
 		printf "\n==> Bajando contenedores con %s...\n" "$$engine"; \
 		$$compose down -v; \
 	else \
+		printf "\n¿Cargar datos de prueba? [s/N]: "; read datos; \
 		printf "\n==> Levantando contenedores con %s...\n" "$$engine"; \
 		$$compose up -d; \
+		case "$$datos" in s|S|si|Si|SI) printf "\n==> Cargando datos de prueba...\n"; ./scripts/seed.sh "$$cli" ;; esac; \
 	fi
 
 # Alias de `containers`
 choose: containers
 
 # ----- OPCIÓN DOCKER -----
-# Levanta contenedores usando Docker Compose (SIN rebuild, usa imagen cached)
-# Esta es la opción recomendada para levantar la aplicación rápidamente
+# Levanta contenedores con la BD LIMPIA (solo esquema, tablas vacías).
+# Usa `make up-test` si quieres los datos de prueba cargados.
 up:
 	@echo "Levantando contenedores con Docker (imagen cached)..."
 	docker compose up -d
@@ -36,6 +38,11 @@ up:
 up-build:
 	@echo "Levantando contenedores con rebuild..."
 	docker compose up -d --build
+
+# Levanta en MODO PRUEBA: recrea la BD (tablas vacías) y carga los datos de prueba
+up-test: down up
+	@echo "Cargando datos de prueba..."
+	@./scripts/seed.sh docker
 
 # Detiene y limpia usando Docker
 down:
@@ -78,16 +85,17 @@ format:
 	docker compose exec medical-rag-api black backend
 	docker compose exec medical-rag-api isort backend
 
-# Datos de prueba
+# Datos de prueba (catálogos + datos de ejemplo) sobre la BD en ejecución
 seed:
-	@./scripts/seed.sh
+	@./scripts/seed.sh docker
 
 # Ejecuta TODAS las pruebas de certificación (backend + front)
 test: test-back test-front
 
 # Pruebas de contrato del API (pytest) dentro del contenedor
 test-back:
-	@echo "==> Backend: pytest en medical_rag_api..."
+	@echo "==> Backend: asegurando catálogos + pytest en medical_rag_api..."
+	docker exec -i medical_pgvector psql -U postgres -d appointment -v ON_ERROR_STOP=1 < script_BD/seeds/seed_catalogs.sql >/dev/null
 	docker compose exec -T -w /app medical-rag-api python -m pytest -q
 
 # Typecheck del front (tsc --noEmit) en un contenedor Node 20 aislado
@@ -103,7 +111,8 @@ test-front:
 test-podman: test-back-podman test-front-podman
 
 test-back-podman:
-	@echo "==> Backend: pytest con Podman..."
+	@echo "==> Backend: asegurando catálogos + pytest con Podman..."
+	podman exec -i medical_pgvector psql -U postgres -d appointment -v ON_ERROR_STOP=1 < script_BD/seeds/seed_catalogs.sql >/dev/null
 	podman-compose exec -T -w /app medical-rag-api python -m pytest -q
 
 test-front-podman:
@@ -117,7 +126,8 @@ test-front-podman:
 # Ayuda específica Docker
 docker-help:
 	@echo "--- Comandos Docker ---"
-	@echo "  make up              - Levanta con Docker (imagen cached)"
+	@echo "  make up              - Levanta con Docker, BD limpia (tablas vacías)"
+	@echo "  make up-test         - Levanta + carga datos de prueba"
 	@echo "  make up-build        - Levantar con rebuild (puede fallar)"
 	@echo "  make down            - Detiene con Docker"
 	@echo "  make start           - Reinicia desde cero"
@@ -138,6 +148,11 @@ docker-help:
 up-podman:
 	@echo "Levantando contenedores con Podman..."
 	podman-compose up -d --build
+
+# Levanta en MODO PRUEBA con Podman: recrea la BD y carga los datos de prueba
+up-test-podman: down-podman up-podman
+	@echo "Cargando datos de prueba (Podman)..."
+	@./scripts/seed.sh podman
 
 # Detiene y limpia usando Podman
 down-podman:
@@ -182,12 +197,13 @@ format-podman:
 
 # Datos de prueba (mismo script)
 seed-podman:
-	@./scripts/seed.sh
+	@./scripts/seed.sh podman
 
 # Ayuda específica Podman
 podman-help:
 	@echo "--- Comandos Podman ---"
 	@echo "  make up-podman       - Levantar con Podman"
+	@echo "  make up-test-podman  - Levantar con Podman + datos de prueba"
 	@echo "  make down-podman     - Detener con Podman"
 	@echo "  make start-podman    - Reiniciar con Podman"
 	@echo "  make logs-podman     - Logs con Podman"
@@ -202,9 +218,10 @@ podman-help:
 help:
 	@echo "=== Makefile: Gestión de Contenedores ==="
 	@echo ""
-	@echo "--- Por defecto (Docker, imagen cached) ---"
+	@echo "--- Por defecto (Docker) ---"
 	@echo "  make containers      - Selector interactivo Docker/Podman (levantar/bajar)"
-	@echo "  make up              - Levanta contenedores (recomendado)"
+	@echo "  make up              - Levanta contenedores, BD limpia (tablas vacías)"
+	@echo "  make up-test         - Levanta + carga datos de prueba"
 	@echo "  make up-build        - Levantar con rebuild (puede fallar)"
 	@echo "  make down            - Detiene y limpia"
 	@echo "  make start           - Reinicia desde cero"
@@ -219,6 +236,7 @@ help:
 	@echo ""
 	@echo "--- Podman (explicito) ---"
 	@echo "  make up-podman       - Levantar con Podman"
+	@echo "  make up-test-podman  - Levantar con Podman + datos de prueba"
 	@echo "  make down-podman     - Detener con Podman"
 	@echo "  make start-podman    - Reiniciar con Podman"
 	@echo "  make logs-podman     - Ver logs con Podman"

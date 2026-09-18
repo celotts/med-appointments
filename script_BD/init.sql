@@ -201,7 +201,7 @@ CREATE TABLE vector_documents (
 
 
 -- ============================================================================
--- SEED DATA
+-- BOOTSTRAP DATA (mínimo para que la API arranque y cree el superusuario)
 -- ============================================================================
 INSERT INTO roles (id, name, created_by_user_id)
 VALUES ('00000000-0000-0000-0000-000000000001', 'SYSTEM_ROLE', NULL);
@@ -230,21 +230,9 @@ INSERT INTO roles (id, name, created_by_user_id)
 VALUES ('00000000-0000-0000-0000-000000000002', 'SUPER_ADMIN', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
 
 
--- Catálogos base (necesarios para crear citas y médicos)
-INSERT INTO appointment_statuses (code, description) VALUES
-    ('PENDIENTE', 'Cita pendiente'),
-    ('CONFIRMADA', 'Cita confirmada'),
-    ('COMPLETADA', 'Cita completada'),
-    ('CANCELADA', 'Cita cancelada'),
-    ('SUSPENDIDA', 'Cita suspendida'),
-    ('REAGENDADA', 'Cita reagendada')
-ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO specialties (name, description) VALUES
-    ('Medicina General', 'Atención primaria'),
-    ('Cardiología', 'Especialidad del corazón'),
-    ('Pediatría', 'Atención de niños y adolescentes')
-ON CONFLICT (name) DO NOTHING;
+-- Los catálogos (estados de cita, especialidades) y los datos de ejemplo NO se
+-- cargan aquí: la BD queda con las tablas vacías. Se cargan solo cuando se
+-- piden, con:  make up-test   (levanta + datos)   o   make seed   (solo datos)
 
 
 -- ============================================================================
