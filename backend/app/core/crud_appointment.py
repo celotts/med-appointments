@@ -1,4 +1,7 @@
-from datetime import datetime
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 from schemas.appointment import (
     VALID_TRANSITIONS,
@@ -15,49 +18,41 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from core.crud_visual_indicator import (
+    DEFAULT_DELAY_TOLERANCE_MINUTES,
+    STATUSES_THAT_OCCUPY,
+    TERMINAL_STATUSES,
+    enrich_appointments_with_visuals,
+    get_status_by_code,
+    get_status_by_id,
+)
 from models.appointment import Appointment as AppointmentModel
 from models.appointment_status import AppointmentStatus as AppointmentStatusModel
 
+
 # Statuses that block the doctor's schedule (prevent booking in that slot)
-_STATUSES_THAT_OCCUPY = (
-    AppointmentStatusCode.PENDING.value,
-    AppointmentStatusCode.CONFIRMED.value,
-    AppointmentStatusCode.RESCHEDULED.value,
-)
+_STATUSES_THAT_OCCUPY = STATUSES_THAT_OCCUPY
 
 # Terminal statuses: cannot reschedule or change from here
-_TERMINAL_STATUSES = (
-    AppointmentStatusCode.CANCELLED.value,
-    AppointmentStatusCode.COMPLETED.value,
-)
+_TERMINAL_STATUSES = TERMINAL_STATUSES
 
 
-async def get_status_by_code(
-    db: AsyncSession, code: str | AppointmentStatusCode
-) -> AppointmentStatusModel | None:
-    value = code.value if isinstance(code, AppointmentStatusCode) else code
-    result = await db.execute(
-        select(AppointmentStatusModel).filter(AppointmentStatusModel.code == value)
-    )
-    return result.scalars().first()
+async def get_status_by_code(db: AsyncSession, code: str | AppointmentStatusCode) -> Optional[object]:
+    return await get_status_by_code(db, code)
 
 
-async def get_status_by_id(
-    db: AsyncSession, status_id: int
-) -> AppointmentStatusModel | None:
-    return await db.get(AppointmentStatusModel, status_id)
+async def get_status_by_id(db: AsyncSession, status_id: int):
+    return await get_status_by_id(db, status_id)
 
 
-async def get_statuses(db: AsyncSession) -> list[AppointmentStatusModel]:
-    result = await db.execute(
-        select(AppointmentStatusModel).order_by(AppointmentStatusModel.id)
-    )
-    return result.scalars().all()
+async def get_statuses(db: AsyncSession) -> list:
+    from core.crud_appointment import get_statuses as original_get_statuses
+    return await original_get_statuses(db)
 
 
 async def get_appointment(
-    db: AsyncSession, appointment_id: int, user_id: int | None = None
-) -> AppointmentModel | None:
+    db: AsyncSession, appointment_id: int, user_id: str | None = None
+) -> Optional[AppointmentModel]:
     """Get a appointment by its ID."""
     stmt = select(AppointmentModel).filter(AppointmentModel.id == appointment_id)
     if user_id is not None:
@@ -74,7 +69,8 @@ async def get_appointments(
     patient_id: int | None = None,
     doctor_id: int | None = None,
     status: str | None = None,
-    user_id: int | None = None,
+    user_id: str | None = None,
+    enrich_visuals: bool = True,
 ) -> list[AppointmentModel]:
     stmt = (
         select(AppointmentModel)
@@ -94,7 +90,14 @@ async def get_appointments(
         stmt = stmt.where(AppointmentModel.user_id == user_id)
     stmt = stmt.offset(skip).limit(limit)
     result = await db.execute(stmt)
-    return result.scalars().all()
+    appointments = result.scalars().all()
+    
+    # Enriquecer con indicadores visuales si se solicita
+    if enrich_visuals and appointments:
+        from core.crud_visual_indicator import enrich_appointments_with_visuals
+        appointments = await enrich_appointments_with_visuals(db, list(appointments))
+    
+    return list(appointments)
 
 
 async def _has_conflict(
@@ -106,6 +109,7 @@ async def _has_conflict(
     exclude_appointment_id: int | None = None,
 ) -> bool:
     """Check if a doctor already has an overlapping appointment in [start, end)."""
+    from core.crud_visual_indicator import _STATUSES_THAT_OCCUPY
     statuses_that_occupy = select(AppointmentStatusModel.id).where(
         AppointmentStatusModel.code.in_(_STATUSES_THAT_OCCUPY)
     )
@@ -122,7 +126,7 @@ async def _has_conflict(
 
 
 async def create_appointment(
-    db: AsyncSession, appointment: AppointmentCreateSchema, user_id: int
+    db: AsyncSession, appointment: AppointmentCreateSchema, user_id: str
 ) -> AppointmentModel:
     if appointment.end_datetime <= appointment.start_datetime:
         raise ValueError("end_datetime must be after start_datetime")
@@ -161,6 +165,7 @@ async def reschedule_appointment(
     new_status: bool = True,
 ) -> AppointmentModel:
     """Reschedule an appointment to a new time slot and mark as RESCHEDULED."""
+    from core.crud_visual_indicator import _TERMINAL_STATUSES
     if db_appointment.status.code in _TERMINAL_STATUSES:
         raise ValueError("Cannot reschedule a cancelled or completed appointment.")
 
@@ -198,6 +203,7 @@ async def change_status(
     db: AsyncSession, db_appointment: AppointmentModel, cambio: AppointmentStatusUpdate
 ) -> AppointmentModel:
     """Transition appointment status following the state machine."""
+    from schemas.appointment import VALID_TRANSITIONS, AppointmentStatusCode
     actual = AppointmentStatusCode(db_appointment.status.code)
     allowed = VALID_TRANSITIONS.get(actual, set())
     if cambio.status not in allowed:
@@ -247,3 +253,10 @@ async def delete_appointment(
     await db.delete(db_appointment)
     await db.commit()
     return db_appointment
+
+
+async def get_statuses(db: AsyncSession) -> list:
+    result = await db.execute(
+        select(AppointmentStatusModel).order_by(AppointmentStatusModel.id)
+    )
+    return result.scalars().all()

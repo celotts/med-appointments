@@ -1,18 +1,20 @@
+from __future__ import annotations
+
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
 
 class AppointmentStatusCode(str, Enum):
     """Possible status codes for a medical appointment."""
-
-    PENDING = "PENDIENTE"
-    CONFIRMED = "CONFIRMADA"
-    COMPLETED = "COMPLETADA"
-    CANCELLED = "CANCELADA"
-    SUSPENDED = "SUSPENDIDA"
-    RESCHEDULED = "REAGENDADA"
+    PENDING = "PENDING"
+    CONFIRMED = "CONFIRMED"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+    SUSPENDED = "SUSPENDED"
+    RESCHEDULED = "RESCHEDULED"
 
 
 # Valid transitions: WHERE you can go from a given state.
@@ -55,6 +57,13 @@ class AppointmentStatusOut(BaseModel):
     description: str | None = None
 
 
+# --- Visual indicator ---
+class VisualIndicatorOut(BaseModel):
+    code: str
+    hex_color: str
+    label: str
+
+
 # --- Appointments ---
 class AppointmentBase(BaseModel):
     patient_id: int
@@ -91,6 +100,11 @@ class AppointmentOut(BaseModel):
     reason: str
     created_at: datetime | None = None
     status: AppointmentStatusOut | None = None
+    
+    # Campos visuales (nuevos)
+    visual_indicator: Optional["VisualIndicatorOut"] = None
+    is_delayed: Optional[bool] = None
+    minutes_until: Optional[int] = None
 
 
 # --- Medical notes ---
@@ -116,3 +130,8 @@ class MedicalNoteOut(MedicalNoteBase):
     id: int
     appointment_id: int
     created_at: datetime | None = None
+
+
+# Resolve forward reference
+VisualIndicatorOut.model_rebuild()
+AppointmentOut.model_rebuild()
