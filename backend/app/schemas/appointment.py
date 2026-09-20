@@ -135,3 +135,12 @@ class MedicalNoteOut(MedicalNoteBase):
 # Resolve forward reference
 VisualIndicatorOut.model_rebuild()
 AppointmentOut.model_rebuild()
+
+
+# --- Paginated response ---
+class PaginatedResponse(BaseModel):
+    items: list[AppointmentOut]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.security import get_password_hash, verify_password
 from models.user import User as UserModel
+from models.role import Role as RoleModel
 
 
 async def get_user(db: AsyncSession, user_id: uuid.UUID) -> UserModel | None:
@@ -87,3 +88,9 @@ async def remove_user(db: AsyncSession, *, user_id: uuid.UUID) -> UserModel | No
         await db.delete(user_to_delete)
         await db.commit()
     return user_to_delete
+
+
+async def get_roles(db: AsyncSession) -> list[RoleModel]:
+    """Get all roles."""
+    result = await db.execute(select(RoleModel))
+    return result.scalars().all()

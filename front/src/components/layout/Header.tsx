@@ -6,7 +6,7 @@ const Header: React.FC = () => {
   const { user, logout } = useAuth();
 
   return (
-    <header className="h-16 bg-medical-primary/10 border-b border-medical-textMuted/30 px-6 flex items-center justify-between sticky top-0 z-10">
+    <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-[100] shadow-md" style={{ backgroundColor: '#ffffff', position: 'sticky', top: 0 }}>
       <div className="flex items-center gap-4">
         <h1 className="text-lg font-semibold text-medical-textMain">
           Bienvenido, {user?.full_name || 'Usuario'}

@@ -14,3 +14,4 @@ from .consulting_room import ConsultingRoom as ConsultingRoom
 from .doctor_schedule import DoctorSchedule as DoctorSchedule
 from .medical_history import MedicalHistory as MedicalHistory
 from .waitlist import Waitlist as Waitlist
+from .visual_indicator import VisualIndicatorConfig as VisualIndicatorConfig

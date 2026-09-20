@@ -11,7 +11,7 @@ from core import crud_doctor_schedule
 from core.db import get_db
 from models.user import User
 
-router = APIRouter(prefix="/doctor-schedules", tags=["Doctor Schedules"])
+router = APIRouter(prefix="", tags=["Doctor Schedules"])
 
 
 @router.get("/", response_model=list[DoctorScheduleResponse])

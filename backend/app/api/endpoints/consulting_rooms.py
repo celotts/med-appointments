@@ -11,7 +11,7 @@ from core import crud_consulting_room
 from core.db import get_db
 from models.user import User
 
-router = APIRouter(prefix="/consulting-rooms", tags=["Consulting Rooms"])
+router = APIRouter(prefix="", tags=["Consulting Rooms"])
 
 
 @router.get("/", response_model=list[ConsultingRoomResponse])

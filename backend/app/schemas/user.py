@@ -30,3 +30,11 @@ class UserInDBBase(UserBase):
 
 class User(UserInDBBase):
     pass
+
+
+class Role(BaseModel):
+    id: uuid.UUID
+    name: str
+
+    class Config:
+        from_attributes = True

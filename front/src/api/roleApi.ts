@@ -7,7 +7,7 @@ export interface Role {
 
 export const roleApi = {
   async getAll(): Promise<Role[]> {
-    const response = await axiosInstance.get('/api/v1/roles');
+    const response = await axiosInstance.get('/roles');
     return response.data.roles || response.data;
   },
 };

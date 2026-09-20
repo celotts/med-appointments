@@ -11,6 +11,7 @@ from schemas.appointment import (
     MedicalNoteCreate,
     MedicalNoteOut,
     MedicalNoteUpdate,
+    PaginatedResponse,
 )
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,30 +24,31 @@ router = APIRouter(prefix="/api/v1", tags=["Appointments"])
 
 @router.get(
     "/appointments/",
-    response_model=list[AppointmentOut],
-    summary="Get a list of appointments",
+    response_model=PaginatedResponse,
+    summary="Get a paginated list of appointments",
 )
 async def list_appointments(
     db: AsyncSession = Depends(get_db),
-    skip: int = 0,
-    limit: int = 100,
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(20, ge=1, le=999, description="Items per page"),
     patient_id: int | None = None,
     doctor_id: int | None = None,
     status: str | None = None,
     enrich_visuals: bool = Query(True, description="Enrich with visual indicators (delayed, proximity)"),
     current_user: UserModel = Depends(get_current_user),
-) -> list[AppointmentOut]:
-    """List of appointments with optional filters by patient, doctor, and status."""
-    return await crud_appointment.get_appointments(
+) -> PaginatedResponse:
+    """List of appointments with pagination, optional filters by patient, doctor, and status."""
+    result = await crud_appointment.get_appointments_paginated(
         db,
-        skip=skip,
-        limit=limit,
+        page=page,
+        page_size=page_size,
         patient_id=patient_id,
         doctor_id=doctor_id,
         status=status,
         user_id=current_user.id,
         enrich_visuals=enrich_visuals,
     )
+    return PaginatedResponse(**result)
 
 
 @router.post(

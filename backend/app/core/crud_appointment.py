@@ -14,7 +14,7 @@ from schemas.appointment import (
 from schemas.appointment import (
     AppointmentUpdate as AppointmentUpdateSchema,
 )
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -98,6 +98,66 @@ async def get_appointments(
         appointments = await enrich_appointments_with_visuals(db, list(appointments))
     
     return list(appointments)
+
+
+async def get_appointments_paginated(
+    db: AsyncSession,
+    *,
+    page: int = 1,
+    page_size: int = 20,
+    patient_id: int | None = None,
+    doctor_id: int | None = None,
+    status: str | None = None,
+    user_id: str | None = None,
+    enrich_visuals: bool = True,
+) -> dict:
+    """Get appointments with pagination info (items + total count)."""
+    skip = (page - 1) * page_size
+    
+    # Base query with filters
+    base_stmt = select(AppointmentModel)
+    if patient_id is not None:
+        base_stmt = base_stmt.where(AppointmentModel.patient_id == patient_id)
+    if doctor_id is not None:
+        base_stmt = base_stmt.where(AppointmentModel.doctor_id == doctor_id)
+    if status is not None:
+        sub = select(AppointmentStatusModel.id).where(
+            AppointmentStatusModel.code == status
+        )
+        base_stmt = base_stmt.where(AppointmentModel.status_id.in_(sub))
+    if user_id is not None:
+        base_stmt = base_stmt.where(AppointmentModel.user_id == user_id)
+    
+    # Get total count
+    count_stmt = select(func.count()).select_from(base_stmt.subquery())
+    total_result = await db.execute(count_stmt)
+    total = total_result.scalar() or 0
+    
+    # Get paginated items
+    items_stmt = (
+        base_stmt
+        .options(selectinload(AppointmentModel.status))
+        .order_by(AppointmentModel.start_datetime.desc())
+        .offset(skip)
+        .limit(page_size)
+    )
+    items_result = await db.execute(items_stmt)
+    appointments = items_result.scalars().all()
+    
+    # Enriquecer con indicadores visuales si se solicita
+    if enrich_visuals and appointments:
+        from core.crud_visual_indicator import enrich_appointments_with_visuals
+        appointments = await enrich_appointments_with_visuals(db, list(appointments))
+    
+    total_pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+    
+    return {
+        "items": list(appointments),
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+    }
 
 
 async def _has_conflict(

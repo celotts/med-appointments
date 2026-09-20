@@ -18,22 +18,22 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     estados = sa.table(
-        "estados_cita",
-        sa.column("codigo", sa.String),
-        sa.column("descripcion", sa.String),
+        "appointment_statuses",
+        sa.column("code", sa.String),
+        sa.column("description", sa.String),
     )
     op.bulk_insert(
         estados,
         [
-            {"codigo": "PENDIENTE", "descripcion": "Cita pendiente de confirmación"},
-            {"codigo": "CONFIRMADA", "descripcion": "Cita confirmada"},
-            {"codigo": "COMPLETADA", "descripcion": "Cita completada"},
-            {"codigo": "CANCELADA", "descripcion": "Cita cancelada"},
-            {"codigo": "SUSPENDIDA", "descripcion": "Cita suspendida"},
-            {"codigo": "REAGENDADA", "descripcion": "Cita reagendada a nueva fecha"},
+            {"code": "PENDIENTE", "description": "Cita pendiente de confirmación"},
+            {"code": "CONFIRMADA", "description": "Cita confirmada"},
+            {"code": "COMPLETADA", "description": "Cita completada"},
+            {"code": "CANCELADA", "description": "Cita cancelada"},
+            {"code": "SUSPENDIDA", "description": "Cita suspendida"},
+            {"code": "REAGENDADA", "description": "Cita reagendada a nueva fecha"},
         ],
     )
 
 
 def downgrade() -> None:
-    op.execute("DELETE FROM estados_cita")
+    op.execute("DELETE FROM appointment_statuses WHERE code IN ('PENDIENTE','CONFIRMADA','COMPLETADA','CANCELADA','SUSPENDIDA','REAGENDADA')")

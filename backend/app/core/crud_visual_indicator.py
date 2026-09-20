@@ -9,6 +9,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models.visual_indicator import VisualIndicatorConfig
 from schemas.visual_indicator import VisualIndicatorConfigCreate, VisualIndicatorConfigUpdate, VisualIndicatorOut
 
+# Mapeo de códigos de estado en español (BD) a códigos de configuración visual
+STATUS_TO_VISUAL_CODE = {
+    "PENDIENTE": "pending",
+    "CONFIRMADA": "confirmed",
+    "REAGENDADA": "rescheduled",
+    "CANCELADA": "cancelled",
+    "COMPLETADA": "completed",
+}
+
+# Constantes para estados que ocupan agenda (bloquean horario)
+STATUSES_THAT_OCCUPY = {"PENDIENTE", "CONFIRMADA", "REAGENDADA"}
+
+# Estados terminales: no se pueden reprogramar desde aquí
+TERMINAL_STATUSES = {"CANCELADA", "COMPLETADA"}
+
+# Tolerancia por defecto para considerar demora (minutos)
+DEFAULT_DELAY_TOLERANCE_MINUTES = 15
+
 
 async def get_visual_config(db: AsyncSession) -> dict[str, VisualIndicatorConfig]:
     """Obtiene toda la configuración visual activa, cacheable."""
@@ -63,10 +81,10 @@ async def get_all_visual_configs(db: AsyncSession) -> list:
 
 
 # Constantes para estados que ocupan agenda (bloquean horario)
-STATUSES_THAT_OCCUPY = {"PENDING", "CONFIRMED", "RESCHEDULED"}
+STATUSES_THAT_OCCUPY = {"PENDIENTE", "CONFIRMADA", "REAGENDADA"}
 
 # Estados terminales: no se pueden reprogramar desde aquí
-TERMINAL_STATUSES = {"CANCELLED", "COMPLETED"}
+TERMINAL_STATUSES = {"CANCELADA", "COMPLETADA"}
 
 # Tolerancia por defecto para considerar demora (minutos)
 DEFAULT_DELAY_TOLERANCE_MINUTES = 15
@@ -87,6 +105,17 @@ async def get_status_by_id(db: AsyncSession, status_id: int):
     return await db.get(AppointmentStatus, status_id)
 
 
+def get_visual_code(status_code: str) -> str:
+    """Mapea código de estado en español a código de configuración visual."""
+    return {
+        "PENDIENTE": "pending",
+        "CONFIRMADA": "confirmed",
+        "REAGENDADA": "rescheduled",
+        "CANCELADA": "cancelled",
+        "COMPLETADA": "completed",
+    }.get(status_code, status_code.lower())
+
+
 def compute_visual_indicator(
     appointment,
     config: dict,
@@ -102,18 +131,18 @@ def compute_visual_indicator(
     now = datetime.now(timezone.utc)
     
     # 1. DEMORADA - máxima prioridad operativa
-    if status_code in ("PENDING", "CONFIRMED", "RESCHEDULED"):
+    if appointment.status and appointment.status.code in ("PENDIENTE", "CONFIRMADA", "REAGENDADA"):
         tolerance = timedelta(minutes=DEFAULT_DELAY_TOLERANCE_MINUTES)
         if datetime.now(timezone.utc) > appointment.start_datetime + tolerance:
             return "delayed", True
     
     # 2. PROXIMIDAD - solo citas futuras en estados que ocupan agenda
     if appointment.start_datetime > datetime.now(timezone.utc):
-        if status_code in STATUSES_THAT_OCCUPY:
+        if appointment.status and appointment.status.code in STATUSES_THAT_OCCUPY:
             return "proximity_calculated", False  # Se calculará en batch
     
     # 3. Estado normal
-    return status_code.lower(), False
+    return get_visual_code(appointment.status.code if appointment.status else "UNKNOWN"), False
 
 
 async def enrich_appointments_with_visuals(
@@ -130,14 +159,28 @@ async def enrich_appointments_with_visuals(
     3. Resto de citas - ordenadas por fecha/hora
     
     Args:
-        db: Sesión de base de datos
+        db: Sesión de base de datos (opcional, si es None usa configuración por defecto)
         appointments: Lista de objetos Appointment con relationships cargados
         delay_tolerance_minutes: Minutos de tolerancia para considerar demora
     
     Returns:
         Lista enriquecida y reordenada
     """
-    config = await get_visual_config(db)
+    if db is not None:
+        config = await get_visual_config(db)
+    else:
+        # Configuración por defecto para tests sin BD
+        config = {
+            "delayed": type('Config', (), {'code': 'delayed', 'label': 'Demorada', 'hex_color': '#EF4444', 'sort_order': 0}),
+            "pending": type('Config', (), {'code': 'pending', 'label': 'Pendiente', 'hex_color': '#6B7280', 'sort_order': 10}),
+            "confirmed": type('Config', (), {'code': 'confirmed', 'label': 'Confirmada', 'hex_color': '#3B82F6', 'sort_order': 5}),
+            "completed": type('Config', (), {'code': 'completed', 'label': 'Completada', 'hex_color': '#10B981', 'sort_order': 20}),
+            "cancelled": type('Config', (), {'code': 'cancelled', 'label': 'Cancelada', 'hex_color': '#EF4444', 'sort_order': 30}),
+            "rescheduled": type('Config', (), {'code': 'rescheduled', 'label': 'Reagendada', 'hex_color': '#F59E0B', 'sort_order': 15}),
+            "proximity_rank_1": type('Config', (), {'code': 'proximity_rank_1', 'label': 'Próxima 1', 'hex_color': '#10B981', 'sort_order': 1}),
+            "proximity_rank_2": type('Config', (), {'code': 'proximity_rank_2', 'label': 'Próxima 2', 'hex_color': '#3B82F6', 'sort_order': 2}),
+            "proximity_rank_3": type('Config', (), {'code': 'proximity_rank_3', 'label': 'Próxima 3', 'hex_color': '#F59E0B', 'sort_order': 3}),
+        }
     now = datetime.now(timezone.utc)
     tolerance = timedelta(minutes=DEFAULT_DELAY_TOLERANCE_MINUTES)
     
@@ -150,14 +193,14 @@ async def enrich_appointments_with_visuals(
         status_code = appt.status.code if appt.status else "UNKNOWN"
         
         # Verificar si está demorada
-        if status_code in ("PENDING", "CONFIRMED", "RESCHEDULED"):
+        if status_code in ("PENDIENTE", "CONFIRMADA", "REAGENDADA"):
             if datetime.now(timezone.utc) > appt.start_datetime + tolerance:
                 delayed.append(appt)
                 continue
         
         # Verificar si es cita futura en estado que ocupa agenda
         if appt.start_datetime > datetime.now(timezone.utc):
-            if appt.status and appt.status.code in {"PENDING", "CONFIRMED", "RESCHEDULED"}:
+            if status_code in STATUSES_THAT_OCCUPY:
                 upcoming.append(appt)
                 continue
         
@@ -165,6 +208,7 @@ async def enrich_appointments_with_visuals(
     
     # Proximidad: top 3 futuras más cercanas
     upcoming.sort(key=lambda x: x.start_datetime)
+    
     proximity_rank = {}
     for i, appt in enumerate(upcoming[:3]):
         proximity_rank[appt.id] = f"proximity_rank_{i+1}"
@@ -179,7 +223,13 @@ async def enrich_appointments_with_visuals(
             appt.is_delayed = True
         else:
             status_code = appt.status.code if appt.status else "UNKNOWN"
-            code = status_code.lower()
+            code = {
+                "PENDIENTE": "pending",
+                "CONFIRMADA": "confirmed",
+                "REAGENDADA": "rescheduled",
+                "CANCELADA": "cancelled",
+                "COMPLETADA": "completed",
+            }.get(status_code, status_code.lower())
             appt.is_delayed = False
         
         cfg = config.get(code, config.get("pending"))

@@ -2,12 +2,13 @@ from typing import Any
 
 from dependencies import get_current_user, get_db
 from fastapi import APIRouter, Depends, HTTPException
-from schemas.user import User, UserCreate
+from schemas.user import User, UserCreate, Role
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core import crud_user
 from models.user import User as UserModel
+from models.role import Role as RoleModel
 
 router = APIRouter()
 
@@ -62,3 +63,17 @@ async def create_user(
             status_code=400, detail="The email is already registered."
         ) from err
     return user
+
+
+@router.get(
+    "/roles",
+    response_model=list[Role],
+    summary="Get a list of roles",
+)
+async def read_roles(
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+) -> Any:
+    """Get a list of roles."""
+    roles = await crud_user.get_roles(db)
+    return roles

@@ -10,7 +10,7 @@ export interface Branch {
 
 export const branchApi = {
   async getAll(): Promise<Branch[]> {
-    const response = await axiosInstance.get('/api/v1/branches');
+    const response = await axiosInstance.get('/branches');
     return response.data.branches || response.data;
   },
 };

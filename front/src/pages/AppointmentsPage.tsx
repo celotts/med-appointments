@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
-import { appointmentApi, Appointment, AppointmentCreate, AppointmentStatus } from '../api/appointmentApi';
+import { appointmentApi, Appointment, AppointmentCreate, AppointmentStatus, PaginatedResponse } from '../api/appointmentApi';
 import { patientApi, Patient } from '../api/patientApi';
 import { doctorApi, Doctor } from '../api/doctorApi';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
+import { FilterButtons } from '../components/common/FilterButtons';
 import { Plus, Search, Loader2, Calendar as CalendarIcon } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext';
 
 const statusColors: Record<string, string> = {
   'PENDIENTE': 'bg-amber-100 text-amber-700 border-amber-200',
@@ -21,6 +23,20 @@ const OCCUPYING_STATUSES = ['PENDIENTE', 'CONFIRMADA', 'REAGENDADA'];
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
+const formatDate = (iso?: string) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+};
+
+const formatDateTime = (iso?: string) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 const toLocalInput = (iso?: string) => {
   if (!iso) return '';
   const d = new Date(iso);
@@ -29,7 +45,10 @@ const toLocalInput = (iso?: string) => {
 };
 
 const AppointmentsPage: React.FC = () => {
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const { user } = useAuth();
+  const isAdminOrSuperAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'admin';
+  const isSpecialist = user?.role === 'specialist' || user?.role === 'doctor';
+
   const [patients, setPatients] = useState<Patient[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [statuses, setStatuses] = useState<AppointmentStatus[]>([]);
@@ -37,32 +56,93 @@ const AppointmentsPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeFilter, setActiveFilter] = useState<string>('all');
+  
+  // Server-side pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
 
   const { register, handleSubmit, reset, getValues, formState: { errors, isSubmitting } } = useForm<AppointmentCreate>();
 
-  const loadData = async () => {
+  // Load reference data (patients, doctors, statuses)
+  const loadReferenceData = useCallback(async () => {
     try {
-      setIsLoading(true);
-      const [appts, pats, docs, stats] = await Promise.all([
-        appointmentApi.getAll(),
+      const [pats, docs, stats] = await Promise.all([
         patientApi.getAll(),
         doctorApi.getAll(),
         appointmentApi.getStatuses(),
       ]);
-      setAppointments(Array.isArray(appts) ? appts : []);
-      setPatients(Array.isArray(pats) ? pats : []);
-      setDoctors(Array.isArray(docs) ? docs : []);
+
+      let filteredPatients = Array.isArray(pats) ? pats : [];
+      let filteredDoctors = Array.isArray(docs) ? docs : [];
+
+      if (!isAdminOrSuperAdmin && isSpecialist) {
+        filteredPatients = filteredPatients.filter((p) => p.doctor_id === user?.id);
+        filteredDoctors = filteredDoctors.filter((d) => d.id === user?.id);
+      }
+
+      setPatients(filteredPatients);
+      setDoctors(filteredDoctors);
       setStatuses(Array.isArray(stats) ? stats : []);
     } catch (error) {
-      toast.error('Error al cargar los datos de la agenda');
+      toast.error('Error al cargar datos de referencia');
+    }
+  }, [isAdminOrSuperAdmin, isSpecialist, user?.id]);
+
+  // Load appointments with server-side pagination
+  const loadAppointments = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      
+      // Determine page size: larger when searching to allow client-side filtering
+      const fetchPageSize = searchTerm ? 100 : pageSize;
+      
+      const filters: { status?: string } = {};
+      if (activeFilter !== 'all') {
+        filters.status = activeFilter;
+      }
+      if (!isAdminOrSuperAdmin && isSpecialist) {
+        // For specialists, the backend already filters by user_id
+      }
+
+      const response: PaginatedResponse<Appointment> = await appointmentApi.getAll(
+        currentPage,
+        fetchPageSize,
+        filters
+      );
+
+      setAppointments(response.items);
+      setTotalItems(response.total);
+      setTotalPages(response.total_pages);
+      
+      // Adjust current page if it exceeds total pages
+      if (currentPage > response.total_pages && response.total_pages > 0) {
+        setCurrentPage(response.total_pages);
+      }
+    } catch (error) {
+      toast.error('Error al cargar las citas');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentPage, pageSize, searchTerm, activeFilter, isAdminOrSuperAdmin, isSpecialist]);
 
+  // Load reference data on mount
   useEffect(() => {
-    loadData();
-  }, []);
+    loadReferenceData();
+  }, [loadReferenceData]);
+
+  // Load appointments when pagination/filter changes
+  useEffect(() => {
+    loadAppointments();
+  }, [loadAppointments]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, activeFilter]);
 
   const patientName = (id: number) => {
     const p = patients.find((x) => x.id === id);
@@ -139,7 +219,7 @@ const AppointmentsPage: React.FC = () => {
         toast.success('Cita programada correctamente');
       }
       setIsModalOpen(false);
-      loadData();
+      loadAppointments();
     } catch (error: any) {
       toast.error(error.response?.data?.detail?.message || error.response?.data?.detail || 'Error al guardar la cita');
     }
@@ -150,60 +230,68 @@ const AppointmentsPage: React.FC = () => {
     try {
       await appointmentApi.delete(appt.id);
       toast.success('Cita eliminada correctamente');
-      loadData();
+      loadAppointments();
     } catch (error: any) {
       toast.error(error.response?.data?.detail?.message || error.response?.data?.detail || 'Error al eliminar la cita');
     }
   };
 
-  const filtered = appointments.filter(
-    (a) =>
-      patientName(a.patient_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doctorName(a.doctor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (a.reason || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Client-side search filtering on current page data
+  const filteredAppointments = useMemo(() => {
+    if (!searchTerm) return appointments;
+    
+    const term = searchTerm.toLowerCase();
+    return appointments.filter(
+      (a) =>
+        patientName(a.patient_id).toLowerCase().includes(term) ||
+        doctorName(a.doctor_id).toLowerCase().includes(term) ||
+        (a.reason || '').toLowerCase().includes(term)
+    );
+  }, [appointments, searchTerm, patients, doctors]);
 
   const columns = [
     {
+      header: 'Fecha y Hora',
+      accessor: 'start_datetime',
+      type: 'date',
+      sortable: true,
+    },
+    {
       header: 'Paciente',
-      accessor: (a: Appointment) => (
-        <span className="font-medium text-medical-textMain">{patientName(a.patient_id)}</span>
-      )
+      accessor: 'patient_id',
+      type: 'string',
+      sortable: true,
     },
     {
       header: 'Doctor',
-      accessor: (a: Appointment) => (
-        <span className="text-slate-600">{doctorName(a.doctor_id)}</span>
-      )
-    },
-    {
-      header: 'Fecha y Hora',
-      accessor: (a: Appointment) => (
-        <div className="flex items-center gap-2 text-slate-600">
-          <CalendarIcon size={14} />
-          {a.start_datetime ? new Date(a.start_datetime).toLocaleString() : '-'}
-        </div>
-      )
+      accessor: 'doctor_id',
+      type: 'string',
+      sortable: true,
     },
     {
       header: 'Estado',
-      accessor: (a: Appointment) => {
-        const status = a.status?.code || statuses.find((s) => s.id === a.status_id)?.code || 'DESCONOCIDO';
-        const colorClass = statusColors[status.toUpperCase()] || 'bg-slate-100 text-slate-600 border-slate-200';
-        return (
-          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${colorClass}`}>
-            {status}
-          </span>
-        );
-      }
+      accessor: 'status_id',
+      type: 'string',
+      sortable: true,
     },
     {
       header: 'Motivo',
-      accessor: (a: Appointment) => (
-        <span className="text-slate-600 truncate max-w-xs block">{a.reason || '-'}</span>
-      )
+      accessor: 'reason',
+      type: 'string',
+      sortable: true,
     },
   ];
+
+  // Handle page size change from DataTable
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1);
+  };
+
+  // Handle page change from DataTable
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   return (
     <div className="space-y-6">
@@ -222,15 +310,19 @@ const AppointmentsPage: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
-        <div className="relative max-w-sm mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input
-            type="text"
-            placeholder="Buscar por paciente, doctor o motivo..."
-            className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary focus:border-transparent outline-none text-sm transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="mb-6">
+          <div className="relative max-w-sm mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input
+              type="text"
+              placeholder="Buscar por paciente, doctor o motivo..."
+              className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary focus:border-transparent outline-none text-sm transition-all"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <FilterButtons activeFilter={activeFilter} onFilterChange={setActiveFilter} />
         </div>
 
         {isLoading ? (
@@ -240,12 +332,24 @@ const AppointmentsPage: React.FC = () => {
           </div>
         ) : (
           <DataTable
-            data={filtered}
+            data={filteredAppointments}
             columns={columns}
             onEdit={openEdit}
             onDelete={handleDelete}
+            pageSize={pageSize}
+            // Pass pagination info for server-side pagination display
+            defaultSortKey="start_datetime"
+            defaultSortDirection="desc"
           />
         )}
+
+        {/* Pagination info */}
+        <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
+          <span>
+            Mostrando {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, totalItems)} de {totalItems} citas
+          </span>
+          <span>Página {currentPage} de {totalPages || 1}</span>
+        </div>
       </div>
 
       <Modal

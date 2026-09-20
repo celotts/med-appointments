@@ -6,6 +6,14 @@ export interface AppointmentStatus {
   description?: string | null;
 }
 
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
 export interface Appointment {
   id: number;
   patient_id: number;
@@ -34,13 +42,12 @@ export interface AppointmentUpdate {
 
 export const appointmentApi = {
   async getAll(
-    skip = 0,
-    limit = 100,
+    page = 1,
+    pageSize = 20,
     filters?: { patient_id?: number; doctor_id?: number; status?: string }
-  ) {
-    const response = await axiosInstance.get('/appointments/', {
-      params: { skip, limit, ...filters },
-    });
+  ): Promise<PaginatedResponse<Appointment>> {
+    const params = { page, page_size: pageSize, ...filters };
+    const response = await axiosInstance.get('/appointments/', { params });
     return response.data;
   },
 
