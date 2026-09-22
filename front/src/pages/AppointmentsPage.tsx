@@ -6,9 +6,10 @@ import { doctorApi, Doctor } from '../api/doctorApi';
 import DataTable, { Column } from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
 import { FilterButtons } from '../components/common/FilterButtons';
-import { Plus, Search, Loader2 } from 'lucide-react';
+import { Plus, Search, Loader2, Sparkles, Check } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
+import { medasistApi, RescheduleSuggestion, AvailabilitySlot } from '../api/medasistApi';
 
 const statusColors: Record<string, string> = {
   'PENDIENTE': 'bg-amber-100 text-amber-700 border-amber-200',
@@ -51,7 +52,19 @@ const AppointmentsPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
 
-  const { register, handleSubmit, reset, getValues, formState: { errors, isSubmitting } } = useForm<AppointmentCreate>();
+  const { register, handleSubmit, reset, getValues, setValue, watch, formState: { errors, isSubmitting } } = useForm<AppointmentCreate>();
+
+  // IA: sugerencias de reagendamiento
+  const [aiAppt, setAiAppt] = useState<Appointment | null>(null);
+  const [aiDate, setAiDate] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<RescheduleSuggestion[] | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  // IA: horarios disponibles al crear/editar cita
+  const [slotLoading, setSlotLoading] = useState(false);
+  const [slotError, setSlotError] = useState<string | null>(null);
+  const [availableSlots, setAvailableSlots] = useState<AvailabilitySlot[] | null>(null);
 
   // Load reference data (patients, doctors, statuses)
   const loadReferenceData = useCallback(async () => {
@@ -144,6 +157,104 @@ const AppointmentsPage: React.FC = () => {
     return s ? s.code : `Estado #${id}`;
   };
 
+  const toDateInput = (iso?: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+
+  const fmtTime = (iso: string) => {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  // ── IA: reagendar con sugerencias ───────────────────────────────────────
+  const openAiReschedule = (appt: Appointment) => {
+    setAiAppt(appt);
+    setAiDate(toDateInput(appt.start_datetime) || new Date().toISOString().slice(0, 10));
+    setAiSuggestions(null);
+    setAiError(null);
+  };
+
+  const closeAiReschedule = () => {
+    setAiAppt(null);
+    setAiSuggestions(null);
+    setAiError(null);
+  };
+
+  const askAiSuggestions = async () => {
+    if (!aiAppt || !aiDate) return;
+    setAiLoading(true);
+    setAiError(null);
+    setAiSuggestions(null);
+    try {
+      const response = await medasistApi.reschedule({
+        appointment_id: aiAppt.id,
+        preferred_date: aiDate,
+      });
+      setAiSuggestions(response.suggestions);
+      if (response.suggestions.length === 0) {
+        setAiError('La IA no encontró horarios libres para esa fecha');
+      }
+    } catch (error: any) {
+      setAiError(error.response?.data?.detail || 'Error al consultar la IA');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const applySuggestion = async (slot: RescheduleSuggestion) => {
+    if (!aiAppt) return;
+    try {
+      await appointmentApi.update(aiAppt.id, {
+        start_datetime: new Date(slot.start).toISOString(),
+        end_datetime: new Date(slot.end).toISOString(),
+        reason: aiAppt.reason,
+      });
+      toast.success('Cita reagendada con IA');
+      closeAiReschedule();
+      loadAppointments();
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail?.message || error.response?.data?.detail || 'Error al aplicar el horario');
+    }
+  };
+
+  // ── IA: horarios disponibles en el formulario ───────────────────────────
+  const askAvailableSlots = async () => {
+    const doctorId = watch('doctor_id');
+    const date = toDateInput(watch('start_datetime'));
+    if (!doctorId) {
+      toast.error('Selecciona un doctor primero');
+      return;
+    }
+    if (!date) {
+      toast.error('Selecciona la fecha de inicio primero');
+      return;
+    }
+    setSlotLoading(true);
+    setSlotError(null);
+    setAvailableSlots(null);
+    try {
+      const slots = await medasistApi.getAvailableSlots({
+        doctor_id: Number(doctorId),
+        date,
+        duration_minutes: 30,
+      });
+      setAvailableSlots(slots);
+    } catch (error: any) {
+      setSlotError(error.response?.data?.detail || 'Error al consultar disponibilidad');
+    } finally {
+      setSlotLoading(false);
+    }
+  };
+
+  const applySlot = (slot: AvailabilitySlot) => {
+    setValue('start_datetime', toLocalInput(slot.start), { shouldValidate: true });
+    setValue('end_datetime', toLocalInput(slot.end), { shouldValidate: true });
+  };
+
   const columns: Column<Appointment>[] = [
     {
       header: 'Fecha y Hora',
@@ -184,6 +295,23 @@ const AppointmentsPage: React.FC = () => {
         <span className="text-slate-600 truncate max-w-xs block">{a.reason || '-'}</span>
       ),
       sortable: true,
+    },
+    {
+      header: 'IA',
+      accessor: (a: Appointment) => {
+        const status = (a.status?.code || statusName(a.status_id)).toUpperCase();
+        if (status !== 'PENDIENTE') return null;
+        return (
+          <button
+            type="button"
+            onClick={() => openAiReschedule(a)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 transition-all shadow-sm"
+          >
+            <Sparkles size={14} />
+            Sugerir horarios
+          </button>
+        );
+      },
     },
   ];
 
@@ -427,6 +555,51 @@ const AppointmentsPage: React.FC = () => {
             {errors.reason && <p className="text-red-500 text-xs mt-1">{errors.reason.message}</p>}
           </div>
 
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-indigo-900">
+                <Sparkles size={16} />
+                <span className="text-sm font-semibold">IA — Sugerir horarios disponibles</span>
+              </div>
+              <button
+                type="button"
+                onClick={askAvailableSlots}
+                disabled={slotLoading}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-all disabled:opacity-60 flex items-center gap-1.5"
+              >
+                {slotLoading ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} />}
+                Buscar
+              </button>
+            </div>
+            <p className="text-xs text-indigo-700/70">
+              Usa la fecha del campo Inicio (arriba) y el doctor seleccionado. Cupos de 30 min.
+            </p>
+            {slotLoading && (
+              <p className="text-xs text-indigo-700 flex items-center gap-1.5">
+                <Loader2 className="animate-spin" size={12} /> Consultando disponibilidad en la agenda...
+              </p>
+            )}
+            {slotError && <p className="text-xs text-red-600">{slotError}</p>}
+            {availableSlots && availableSlots.length === 0 && (
+              <p className="text-xs text-slate-500">No hay cupos libres para ese día.</p>
+            )}
+            {availableSlots && availableSlots.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {availableSlots.map((slot, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => applySlot(slot)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-indigo-200 text-indigo-800 hover:border-indigo-500 hover:bg-indigo-100 transition-all flex items-center gap-1.5"
+                  >
+                    <Check size={12} />
+                    {fmtTime(slot.start)} — {fmtTime(slot.end)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="pt-4 flex justify-end gap-3">
             <button
               type="button"
@@ -445,6 +618,77 @@ const AppointmentsPage: React.FC = () => {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={!!aiAppt}
+        onClose={closeAiReschedule}
+        title={aiAppt ? `Reagendar con IA — Cita #${aiAppt.id}` : 'Reagendar con IA'}
+      >
+        <div className="space-y-4">
+          {aiAppt && (
+            <div className="text-sm space-y-1 bg-slate-50 border border-slate-200 rounded-lg p-3">
+              <p className="text-medical-textMain font-medium">
+                {patientName(aiAppt.patient_id)} con {doctorName(aiAppt.doctor_id)}
+              </p>
+              <p className="text-slate-500">
+                Actual: <span className="font-medium text-slate-700">{fmtTime(aiAppt.start_datetime)} — {fmtTime(aiAppt.end_datetime)}</span>
+              </p>
+            </div>
+          )}
+
+          <div className="flex gap-3 items-end">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-medical-textMain mb-1">Fecha preferida *</label>
+              <input
+                type="date"
+                value={aiDate}
+                onChange={(e) => setAiDate(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={askAiSuggestions}
+              disabled={aiLoading || !aiDate}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 transition-all disabled:opacity-60 flex items-center gap-2"
+            >
+              {aiLoading ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+              Buscar horarios IA
+            </button>
+          </div>
+
+          {aiError && <p className="text-sm text-red-600">{aiError}</p>}
+
+          {aiSuggestions && aiSuggestions.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-medical-textMain">Horarios sugeridos por la IA:</p>
+              {aiSuggestions.map((slot, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-3 hover:border-indigo-400 transition-all"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-medical-textMain">{fmtTime(slot.start)} — {fmtTime(slot.end)}</p>
+                    <p className="text-xs text-slate-500">Compatibilidad: {Math.round(slot.score * 100)}%</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => applySuggestion(slot)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-all flex items-center gap-1.5"
+                  >
+                    <Check size={14} />
+                    Usar
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <p className="text-[10px] text-slate-400">
+            La IA propone horarios libres según la agenda del médico. Verifica antes de confirmar.
+          </p>
+        </div>
       </Modal>
     </div>
   );
