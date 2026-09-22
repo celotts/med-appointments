@@ -4,8 +4,8 @@ from typing import Any
 
 from dependencies import get_current_user, get_db
 from dependencies_i18n import I18nResponse, get_language
-from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -211,6 +211,115 @@ async def get_doctors_by_branch(
         "total": len(doctors),
         "doctors": [dict(d) for d in doctors],
     }
+
+
+class BranchCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    address: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    is_active: bool = True
+
+
+class BranchUpdate(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=100)
+    address: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    is_active: bool | None = None
+
+
+@router.post(
+    "/branches",
+    status_code=201,
+    summary="Create a clinic branch",
+)
+async def create_branch(
+    payload: BranchCreate,
+    *,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
+) -> Any:
+    result = await db.execute(
+        text(
+            """
+            INSERT INTO branches (name, address, phone, email, is_active)
+            VALUES (:name, :address, :phone, :email, :is_active)
+            RETURNING id, name, address, phone, email, is_active,
+                      created_at, updated_at, deleted_at
+            """
+        ),
+        payload.model_dump(),
+    )
+    await db.commit()
+    return dict(result.mappings().first())
+
+
+@router.put(
+    "/branches/{branch_id}",
+    summary="Update a clinic branch",
+)
+async def update_branch(
+    branch_id: int,
+    payload: BranchUpdate,
+    *,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
+) -> Any:
+    values = payload.model_dump(exclude_unset=True)
+    if not values:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    exists = await db.execute(
+        text("SELECT 1 FROM branches WHERE id = :id AND deleted_at IS NULL"),
+        {"id": branch_id},
+    )
+    if not exists.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Branch not found")
+
+    assignments = ", ".join(f"{key} = :{key}" for key in values)
+    values["branch_id"] = branch_id
+    result = await db.execute(
+        text(
+            f"""
+            UPDATE branches
+            SET {assignments}, updated_at = NOW()
+            WHERE id = :branch_id AND deleted_at IS NULL
+            RETURNING id, name, address, phone, email, is_active,
+                      created_at, updated_at, deleted_at
+            """
+        ),
+        values,
+    )
+    await db.commit()
+    return dict(result.mappings().first())
+
+
+@router.delete(
+    "/branches/{branch_id}",
+    status_code=204,
+    summary="Soft-delete a clinic branch",
+)
+async def delete_branch(
+    branch_id: int,
+    *,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
+):
+    result = await db.execute(
+        text(
+            "UPDATE branches SET deleted_at = NOW() "
+            "WHERE id = :id AND deleted_at IS NULL RETURNING id"
+        ),
+        {"id": branch_id},
+    )
+    await db.commit()
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Branch not found")
+    return None
 
 
 # ============================================================================

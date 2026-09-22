@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { doctorScheduleApi, DoctorSchedule, DoctorScheduleCreate, DoctorScheduleUpdate, DAYS_OF_WEEK } from '../api/doctorScheduleApi';
+import { doctorScheduleApi, DoctorSchedule, DoctorScheduleCreate, DAYS_OF_WEEK } from '../api/doctorScheduleApi';
 import { doctorApi, Doctor } from '../api/doctorApi';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
@@ -14,7 +14,7 @@ const DoctorSchedulePage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<DoctorSchedule | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting }, watch, setValue } = useForm<DoctorScheduleCreate>();
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<DoctorScheduleCreate>();
 
   const loadData = async () => {
     try {
@@ -52,7 +52,7 @@ const DoctorSchedulePage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const onSubmit = async (data: DoctorScheduleCreate | DoctorScheduleUpdate) => {
+  const onSubmit = async (data: DoctorScheduleCreate) => {
     try {
       if (editingSchedule) {
         await doctorScheduleApi.update(editingSchedule.id, data);
@@ -80,13 +80,13 @@ const DoctorSchedulePage: React.FC = () => {
   };
 
   const filtered = schedules.filter(
-    (s) => doctors.find(d => d.id === s.doctor_id)?.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           doctors.find(d => d.id === s.doctor_id)?.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (s) => doctors.find(d => d.id === Number(s.doctor_id))?.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           doctors.find(d => d.id === Number(s.doctor_id))?.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
            s.day_of_week.toString().includes(searchTerm)
   );
 
   const doctorName = (id: string) => {
-    const d = doctors.find(d => d.id === id);
+    const d = doctors.find(d => d.id === Number(id));
     return d ? `Dr. ${d.first_name} ${d.last_name}` : id;
   };
 

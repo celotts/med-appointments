@@ -8,13 +8,17 @@ from pydantic import BaseModel, ConfigDict
 
 
 class AppointmentStatusCode(str, Enum):
-    """Possible status codes for a medical appointment."""
-    PENDING = "PENDING"
-    CONFIRMED = "CONFIRMED"
-    COMPLETED = "COMPLETED"
-    CANCELLED = "CANCELLED"
-    SUSPENDED = "SUSPENDED"
-    RESCHEDULED = "RESCHEDULED"
+    """Possible status codes for a medical appointment.
+
+    Values must match the Spanish codes stored in the DB (see
+    script_BD/seeds/seed_catalogs.sql); the frontend and tests rely on them.
+    """
+    PENDING = "PENDIENTE"
+    CONFIRMED = "CONFIRMADA"
+    COMPLETED = "COMPLETADA"
+    CANCELLED = "CANCELADA"
+    SUSPENDED = "SUSPENDIDA"
+    RESCHEDULED = "REAGENDADA"
 
 
 # Valid transitions: WHERE you can go from a given state.

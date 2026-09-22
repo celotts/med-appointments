@@ -3,10 +3,10 @@ import { useForm } from 'react-hook-form';
 import { appointmentApi, Appointment, AppointmentCreate, AppointmentStatus, PaginatedResponse } from '../api/appointmentApi';
 import { patientApi, Patient } from '../api/patientApi';
 import { doctorApi, Doctor } from '../api/doctorApi';
-import DataTable from '../components/common/DataTable';
+import DataTable, { Column } from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
 import { FilterButtons } from '../components/common/FilterButtons';
-import { Plus, Search, Loader2, Calendar as CalendarIcon } from 'lucide-react';
+import { Plus, Search, Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -22,20 +22,6 @@ const statusColors: Record<string, string> = {
 const OCCUPYING_STATUSES = ['PENDIENTE', 'CONFIRMADA', 'REAGENDADA'];
 
 const pad = (n: number) => String(n).padStart(2, '0');
-
-const formatDate = (iso?: string) => {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
-};
-
-const formatDateTime = (iso?: string) => {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
 
 const toLocalInput = (iso?: string) => {
   if (!iso) return '';
@@ -60,7 +46,7 @@ const AppointmentsPage: React.FC = () => {
   
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize] = useState(20);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -152,6 +138,54 @@ const AppointmentsPage: React.FC = () => {
     const d = doctors.find((x) => x.id === id);
     return d ? `Dr. ${d.first_name} ${d.last_name}` : `Médico #${id}`;
   };
+
+  const statusName = (id: number) => {
+    const s = statuses.find((x) => x.id === id);
+    return s ? s.code : `Estado #${id}`;
+  };
+
+  const columns: Column<Appointment>[] = [
+    {
+      header: 'Fecha y Hora',
+      accessor: 'start_datetime',
+      type: 'date',
+      sortable: true,
+    },
+    {
+      header: 'Paciente',
+      accessor: (a: Appointment) => (
+        <span className="font-medium text-medical-textMain">{patientName(a.patient_id)}</span>
+      ),
+      sortable: true,
+    },
+    {
+      header: 'Doctor',
+      accessor: (a: Appointment) => (
+        <span className="text-slate-600">{doctorName(a.doctor_id)}</span>
+      ),
+      sortable: true,
+    },
+    {
+      header: 'Estado',
+      accessor: (a: Appointment) => {
+        const status = a.status?.code || statusName(a.status_id);
+        const colorClass = statusColors[status] || 'bg-slate-100 text-slate-600 border-slate-200';
+        return (
+          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${colorClass}`}>
+            {status}
+          </span>
+        );
+      },
+      sortable: true,
+    },
+    {
+      header: 'Motivo',
+      accessor: (a: Appointment) => (
+        <span className="text-slate-600 truncate max-w-xs block">{a.reason || '-'}</span>
+      ),
+      sortable: true,
+    },
+  ];
 
   const hasDoctorConflict = (start?: string, end?: string, doctorId?: number) => {
     if (!start || !end || !doctorId) return false;
@@ -248,50 +282,6 @@ const AppointmentsPage: React.FC = () => {
         (a.reason || '').toLowerCase().includes(term)
     );
   }, [appointments, searchTerm, patients, doctors]);
-
-  const columns = [
-    {
-      header: 'Fecha y Hora',
-      accessor: 'start_datetime',
-      type: 'date',
-      sortable: true,
-    },
-    {
-      header: 'Paciente',
-      accessor: 'patient_id',
-      type: 'string',
-      sortable: true,
-    },
-    {
-      header: 'Doctor',
-      accessor: 'doctor_id',
-      type: 'string',
-      sortable: true,
-    },
-    {
-      header: 'Estado',
-      accessor: 'status_id',
-      type: 'string',
-      sortable: true,
-    },
-    {
-      header: 'Motivo',
-      accessor: 'reason',
-      type: 'string',
-      sortable: true,
-    },
-  ];
-
-  // Handle page size change from DataTable
-  const handlePageSizeChange = (newPageSize: number) => {
-    setPageSize(newPageSize);
-    setCurrentPage(1);
-  };
-
-  // Handle page change from DataTable
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
 
   return (
     <div className="space-y-6">

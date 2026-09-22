@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { consultingRoomApi, ConsultingRoom, ConsultingRoomCreate, ConsultingRoomUpdate } from '../api/consultingRoomApi';
+import { consultingRoomApi, ConsultingRoom, ConsultingRoomCreate } from '../api/consultingRoomApi';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
 import { Plus, Search, Loader2 } from 'lucide-react';
@@ -44,7 +44,7 @@ const ConsultingRoomPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const onSubmit = async (data: ConsultingRoomCreate | ConsultingRoomUpdate) => {
+  const onSubmit = async (data: ConsultingRoomCreate) => {
     try {
       if (editingRoom) {
         await consultingRoomApi.update(editingRoom.id, data);

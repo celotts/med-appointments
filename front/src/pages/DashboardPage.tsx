@@ -3,7 +3,7 @@ import { Users, Calendar, CheckCircle, AlertCircle, TrendingUp, FileText, X } fr
 import { reportsApi, DashboardSummary } from '../api/reportsApi';
 import { patientApi, Patient } from '../api/patientApi';
 import { toast } from 'react-hot-toast';
-import DataTable from '../components/common/DataTable';
+import DataTable, { Column } from '../components/common/DataTable';
 
 const StatCard = ({ title, value, icon: Icon, color, onClick, clickable = false }: any) => (
   <div 
@@ -87,7 +87,7 @@ const DashboardPage: React.FC = () => {
     );
   }
 
-  const patientColumns = [
+  const patientColumns: Column<Patient>[] = [
     {
       header: 'Documento',
       accessor: 'document_number',
@@ -209,7 +209,7 @@ const DashboardPage: React.FC = () => {
       </div>
 
       {showPatientsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-xl max-w-5xl w-full max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-slate-200 sticky top-0 bg-white rounded-t-2xl">
               <h3 className="text-lg font-semibold text-medical-textMain">Total Pacientes ({patients.length})</h3>

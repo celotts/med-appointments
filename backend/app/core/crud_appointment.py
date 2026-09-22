@@ -38,16 +38,14 @@ _TERMINAL_STATUSES = TERMINAL_STATUSES
 
 
 async def get_status_by_code(db: AsyncSession, code: str | AppointmentStatusCode) -> Optional[object]:
-    return await get_status_by_code(db, code)
+    result = await db.execute(
+        select(AppointmentStatusModel).where(AppointmentStatusModel.code == code)
+    )
+    return result.scalars().first()
 
 
 async def get_status_by_id(db: AsyncSession, status_id: int):
-    return await get_status_by_id(db, status_id)
-
-
-async def get_statuses(db: AsyncSession) -> list:
-    from core.crud_appointment import get_statuses as original_get_statuses
-    return await original_get_statuses(db)
+    return await db.get(AppointmentStatusModel, status_id)
 
 
 async def get_appointment(
@@ -169,7 +167,7 @@ async def _has_conflict(
     exclude_appointment_id: int | None = None,
 ) -> bool:
     """Check if a doctor already has an overlapping appointment in [start, end)."""
-    from core.crud_visual_indicator import _STATUSES_THAT_OCCUPY
+    from core.crud_visual_indicator import STATUSES_THAT_OCCUPY
     statuses_that_occupy = select(AppointmentStatusModel.id).where(
         AppointmentStatusModel.code.in_(_STATUSES_THAT_OCCUPY)
     )
@@ -225,8 +223,8 @@ async def reschedule_appointment(
     new_status: bool = True,
 ) -> AppointmentModel:
     """Reschedule an appointment to a new time slot and mark as RESCHEDULED."""
-    from core.crud_visual_indicator import _TERMINAL_STATUSES
-    if db_appointment.status.code in _TERMINAL_STATUSES:
+    from core.crud_visual_indicator import TERMINAL_STATUSES
+    if db_appointment.status.code in TERMINAL_STATUSES:
         raise ValueError("Cannot reschedule a cancelled or completed appointment.")
 
     new_start = appointment.start_datetime or db_appointment.start_datetime

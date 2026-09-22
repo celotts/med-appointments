@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 
-interface Column<T> {
+export interface Column<T> {
   header: string;
   accessor: keyof T | ((item: T) => React.ReactNode);
   sortable?: boolean;
@@ -167,7 +167,7 @@ const DataTable = <T extends { id: any }>({
                     <td key={colIdx} className="px-4 py-3 text-sm text-medical-textMain">
                       {typeof col.accessor === 'function'
                         ? col.accessor(item)
-                        : escapeHtml(item[col.accessor as string] as string)}
+                        : escapeHtml((item as any)[col.accessor as string] as string)}
                     </td>
                   ))}
                   {(onEdit || onDelete) && (

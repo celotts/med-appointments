@@ -291,3 +291,87 @@ ALTER TABLE doctors ADD CONSTRAINT fk_doctors_branch
 
 
 CREATE INDEX idx_doctors_branch ON doctors(branch_id);
+
+
+-- ============================================================================
+-- VISUAL INDICATOR CONFIG
+-- (requerida por el API para enriquecer las citas con indicadores visuales)
+-- ============================================================================
+CREATE TABLE visual_indicator_config (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(50) NOT NULL UNIQUE,
+    label VARCHAR(100) NOT NULL,
+    hex_color VARCHAR(7) NOT NULL DEFAULT '#6B7280',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE
+);
+
+INSERT INTO visual_indicator_config (code, label, hex_color, sort_order, is_active) VALUES
+    ('delayed',          'Demorada',    '#EF4444', 0,  TRUE),
+    ('proximity_rank_1', 'Próxima 1',   '#10B981', 1,  TRUE),
+    ('proximity_rank_2', 'Próxima 2',   '#3B82F6', 2,  TRUE),
+    ('proximity_rank_3', 'Próxima 3',   '#F59E0B', 3,  TRUE),
+    ('confirmed',        'Confirmada',  '#3B82F6', 5,  TRUE),
+    ('pending',          'Pendiente',   '#6B7280', 10, TRUE),
+    ('rescheduled',      'Reagendada',  '#F59E0B', 15, TRUE),
+    ('completed',        'Completada',  '#10B981', 20, TRUE),
+    ('cancelled',        'Cancelada',   '#EF4444', 30, TRUE);
+
+
+-- ============================================================================
+-- CONSULTING ROOMS, DOCTOR SCHEDULES, MEDICAL HISTORIES
+-- (requeridas por los endpoints /consulting-rooms, /doctor-schedules
+--  y /medical-histories; el initdb anterior no las incluía y rompía los tests)
+-- ============================================================================
+CREATE TABLE consulting_rooms (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    address VARCHAR(200),
+    phone_number VARCHAR(15),
+    user_id UUID,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT fk_consulting_rooms_user FOREIGN KEY (user_id)
+        REFERENCES users (id) ON DELETE SET NULL
+);
+
+
+CREATE TABLE doctor_schedules (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    doctor_id INT NOT NULL,
+    user_id UUID,
+    day_of_week INT NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    slot_duration_minutes INT NOT NULL DEFAULT 30,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_doctor_schedules_doctor FOREIGN KEY (doctor_id)
+        REFERENCES doctors (id) ON DELETE CASCADE
+);
+
+
+CREATE TABLE medical_histories (
+    id SERIAL PRIMARY KEY,
+    patient_id INT NOT NULL,
+    doctor_id INT NOT NULL,
+    consulting_room_id INT,
+    diagnosis TEXT,
+    prescription TEXT,
+    treatment TEXT,
+    ai_summary TEXT,
+    date DATE NOT NULL DEFAULT CURRENT_DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_medical_histories_patient FOREIGN KEY (patient_id)
+        REFERENCES patients (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_medical_histories_doctor FOREIGN KEY (doctor_id)
+        REFERENCES doctors (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_medical_histories_room FOREIGN KEY (consulting_room_id)
+        REFERENCES consulting_rooms (id) ON DELETE SET NULL
+);
+
+
+CREATE INDEX idx_doctor_schedules_doctor ON doctor_schedules(doctor_id);
+CREATE INDEX idx_medical_histories_patient ON medical_histories(patient_id);
+CREATE INDEX idx_medical_histories_doctor ON medical_histories(doctor_id);
