@@ -7,7 +7,7 @@ from schemas import BaseSchema as BaseSchema
 
 
 class DoctorScheduleBase(BaseModel):
-    doctor_id: str = Field(..., description="ID del médico (UUID)")
+    doctor_id: int = Field(..., description="ID del médico")
     day_of_week: int = Field(
         ..., ge=1, le=7, description="Día de la semana (1=Lunes, 7=Domingo)"
     )
@@ -23,7 +23,7 @@ class DoctorScheduleCreate(DoctorScheduleBase):
 
 
 class DoctorScheduleUpdate(BaseModel):
-    doctor_id: str | None = Field(default=None, description="ID del médico (UUID)")
+    doctor_id: int | None = Field(default=None, description="ID del médico")
     day_of_week: int | None = Field(
         default=None, ge=1, le=7, description="Día de la semana (1=Lunes, 7=Domingo)"
     )
@@ -35,7 +35,7 @@ class DoctorScheduleUpdate(BaseModel):
 
 
 class DoctorScheduleResponse(DoctorScheduleBase):
-    id: str
+    id: int
     created_at: datetime
 
     class Config:

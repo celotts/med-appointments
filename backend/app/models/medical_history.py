@@ -1,32 +1,28 @@
 from __future__ import annotations
 
-import uuid
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, func
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
 
+from .consulting_room import ConsultingRoom
+
 if TYPE_CHECKING:
-    pass
+    from .patient import Patient
+    from .doctor import Doctor
 
 
 class MedicalHistory(Base):
     __tablename__ = "medical_histories"
     __table_args__ = {"extend_existing": True}
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    patient_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("patients.id"), nullable=False
-    )
-    doctor_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("doctors.id"), nullable=False
-    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), nullable=False)
+    doctor_id: Mapped[int] = mapped_column(Integer, ForeignKey("doctors.id"), nullable=False)
+    consulting_room_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("consulting_rooms.id"), nullable=True)
     diagnosis: Mapped[str | None] = mapped_column(String, nullable=True)
     prescription: Mapped[str | None] = mapped_column(String, nullable=True)
     treatment: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -39,7 +35,7 @@ class MedicalHistory(Base):
     # Relationships
     patient = relationship("Patient", back_populates="medical_histories")
     doctor = relationship("Doctor", back_populates="medical_histories")
-    consulting_room = relationship("ConsultingRoom", back_populates="medical_histories")
+    consulting_room = relationship(ConsultingRoom, back_populates="medical_histories")
 
     def __repr__(self) -> str:
         return f"MedicalHistory(id={self.id}, patient_id={self.patient_id}, date={self.date})"

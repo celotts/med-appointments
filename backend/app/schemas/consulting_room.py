@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, Field
@@ -35,7 +36,7 @@ class ConsultingRoomUpdate(BaseModel):
 
 
 class ConsultingRoomResponse(ConsultingRoomBase):
-    id: str
+    id: uuid.UUID
     created_at: datetime
 
     class Config:

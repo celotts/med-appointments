@@ -6,11 +6,10 @@ from typing import TYPE_CHECKING
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from core.db import Base
+from app.core.db import Base
 
-if TYPE_CHECKING:
-    from .doctor import Doctor
-    from .patient import Patient
+from .doctor import Doctor
+from .patient import Patient
 
 
 class Waitlist(Base):
@@ -34,6 +33,6 @@ class Waitlist(Base):
     )
 
     patient: Mapped[Patient] = relationship(
-        "Patient", back_populates="waitlist_entries", foreign_keys=[patient_id]
+        Patient, back_populates="waitlist_entries", foreign_keys=[patient_id]
     )
-    doctor: Mapped[Doctor] = relationship("Doctor", foreign_keys=[doctor_id])
+    doctor: Mapped[Doctor] = relationship(Doctor, foreign_keys=[doctor_id])

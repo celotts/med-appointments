@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, Integer, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from core.db import Base
+from app.core.db import Base
 
-if TYPE_CHECKING:
-    from .appointment import Appointment
+from .appointment import Appointment
 
 
 class MedicalNote(Base):
@@ -29,6 +27,6 @@ class MedicalNote(Base):
         DateTime(timezone=True), server_default=func.current_timestamp(), nullable=True
     )
 
-    appointment: Mapped[Appointment] = relationship(
-        "Appointment", back_populates="medical_note", foreign_keys=[appointment_id]
+    appointment: Mapped["Appointment"] = relationship(
+        Appointment, back_populates="medical_note", foreign_keys=[appointment_id]
     )

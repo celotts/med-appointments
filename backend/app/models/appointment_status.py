@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from core.db import Base
+from app.core.db import Base
 
-if TYPE_CHECKING:
-    from .appointment import Appointment
+from .appointment import Appointment
 
 
 class AppointmentStatus(Base):
@@ -18,6 +15,6 @@ class AppointmentStatus(Base):
     code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
     description: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
-    appointments: Mapped[list[Appointment]] = relationship(
-        "Appointment", back_populates="status"
+    appointments: Mapped[list["Appointment"]] = relationship(
+        Appointment, back_populates="status"
     )

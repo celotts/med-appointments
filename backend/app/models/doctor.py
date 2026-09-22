@@ -6,11 +6,10 @@ from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from core.db import Base
+from app.core.db import Base
 
-if TYPE_CHECKING:
-    from .branch import Branch
-    from .specialty import Specialty
+from .specialty import Specialty
+from .branch import Branch
 
 
 class Doctor(Base):
@@ -18,10 +17,10 @@ class Doctor(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     specialty_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("specialties.id", ondelete="RESTRICT"), nullable=False
+        Integer, ForeignKey(Specialty.id, ondelete="RESTRICT"), nullable=False
     )
     branch_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("branches.id", ondelete="SET NULL"), nullable=True
+        Integer, ForeignKey(Branch.id, ondelete="SET NULL"), nullable=True
     )
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -37,7 +36,14 @@ class Doctor(Base):
         DateTime(timezone=True), server_default=func.current_timestamp(), nullable=True
     )
 
-    specialty: Mapped[Specialty] = relationship(
-        "Specialty", foreign_keys=[specialty_id]
+    specialty: Mapped["Specialty"] = relationship(
+        Specialty, foreign_keys=[specialty_id]
     )
-    branch: Mapped[Branch | None] = relationship("Branch", foreign_keys=[branch_id])
+    branch: Mapped["Branch | None"] = relationship(Branch, foreign_keys=[branch_id])
+    schedules: Mapped[list["DoctorSchedule"]] = relationship(
+        "DoctorSchedule", back_populates="doctor"
+    )
+    medical_histories: Mapped[list["MedicalHistory"]] = relationship(
+        "MedicalHistory", back_populates="doctor"
+    )
+    

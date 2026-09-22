@@ -3,16 +3,26 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, DateTime, Integer, String, func
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from core.db import Base
+from app.core.db import Base
+
+from .medical_history import MedicalHistory
 
 if TYPE_CHECKING:
     from .appointment import Appointment
     from .waitlist import Waitlist
 
 
+def _get_appointment():
+    from .appointment import Appointment
+    return Appointment
+
+
+def _get_waitlist():
+    from .waitlist import Waitlist
+    return Waitlist
 class Patient(Base):
     __tablename__ = "patients"
 
@@ -29,9 +39,12 @@ class Patient(Base):
         DateTime(timezone=True), server_default=func.current_timestamp(), nullable=True
     )
 
-    appointments: Mapped[list[Appointment]] = relationship(
-        "Appointment", back_populates="patient"
+    appointments: Mapped[list["Appointment"]] = relationship(
+        _get_appointment, back_populates="patient"
     )
-    waitlist_entries: Mapped[list[Waitlist]] = relationship(
-        "Waitlist", back_populates="patient"
+    waitlist_entries: Mapped[list["Waitlist"]] = relationship(
+        _get_waitlist, back_populates="patient"
+    )
+    medical_histories: Mapped[list["MedicalHistory"]] = relationship(
+        MedicalHistory, back_populates="patient"
     )
