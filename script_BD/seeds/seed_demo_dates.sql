@@ -80,7 +80,7 @@ WHERE p.document_number = 'DEMO-PAT-002'
   AND u.email = 'admin@medapp.com'
   AND NOT EXISTS (SELECT 1 FROM appointments a WHERE a.reason = 'Demorada doctor 2 - 08:30');
 
--- Cita COMPLETADA (no debe aparecer en delayed ni proximity)
+-- Cita ATENDIDA (no debe aparecer en delayed ni proximity)
 INSERT INTO appointments (patient_id, doctor_id, status_id, user_id, start_datetime, end_datetime, reason)
 SELECT p.id, d.id, st.id, u.id,
        TIMESTAMPTZ '2026-09-17 10:00:00+00',
@@ -89,7 +89,7 @@ SELECT p.id, d.id, st.id, u.id,
 FROM patients p, doctors d, appointment_statuses st, users u
 WHERE p.document_number = 'DEMO-PAT-001'
   AND d.document_number = 'DEMO-DOC-001'
-  AND st.code = 'COMPLETADA'
+  AND st.code = 'ATENDIDA'
   AND u.email = 'admin@medapp.com'
   AND NOT EXISTS (SELECT 1 FROM appointments a WHERE a.reason = 'Completada ayer - prueba completed');
 

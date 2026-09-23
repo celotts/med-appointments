@@ -15,7 +15,7 @@ class AppointmentStatusCode(str, Enum):
     """
     PENDING = "PENDIENTE"
     CONFIRMED = "CONFIRMADA"
-    COMPLETED = "COMPLETADA"
+    ATTENDED = "ATENDIDA"
     CANCELLED = "CANCELADA"
     SUSPENDED = "SUSPENDIDA"
     RESCHEDULED = "REAGENDADA"
@@ -25,30 +25,31 @@ class AppointmentStatusCode(str, Enum):
 VALID_TRANSITIONS: dict[AppointmentStatusCode, set[AppointmentStatusCode]] = {
     AppointmentStatusCode.PENDING: {
         AppointmentStatusCode.CONFIRMED,
-        AppointmentStatusCode.COMPLETED,
+        AppointmentStatusCode.ATTENDED,
         AppointmentStatusCode.CANCELLED,
         AppointmentStatusCode.SUSPENDED,
         AppointmentStatusCode.RESCHEDULED,
     },
     AppointmentStatusCode.CONFIRMED: {
-        AppointmentStatusCode.COMPLETED,
+        AppointmentStatusCode.ATTENDED,
         AppointmentStatusCode.CANCELLED,
         AppointmentStatusCode.SUSPENDED,
         AppointmentStatusCode.RESCHEDULED,
     },
     AppointmentStatusCode.RESCHEDULED: {
         AppointmentStatusCode.CONFIRMED,
-        AppointmentStatusCode.COMPLETED,
+        AppointmentStatusCode.ATTENDED,
         AppointmentStatusCode.CANCELLED,
         AppointmentStatusCode.SUSPENDED,
     },
     AppointmentStatusCode.SUSPENDED: {
         AppointmentStatusCode.CONFIRMED,
-        AppointmentStatusCode.COMPLETED,
+        AppointmentStatusCode.ATTENDED,
         AppointmentStatusCode.RESCHEDULED,
+        AppointmentStatusCode.CANCELLED,
     },
     AppointmentStatusCode.CANCELLED: set(),
-    AppointmentStatusCode.COMPLETED: set(),
+    AppointmentStatusCode.ATTENDED: set(),
 }
 
 

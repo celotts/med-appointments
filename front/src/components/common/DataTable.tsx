@@ -58,6 +58,7 @@ const DataTable = <T extends { id: any }>({
 }: DataTableProps<T>) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(initialPageSize);
+  const [inputValue, setInputValue] = useState(String(initialPageSize));
   const [sortKey, setSortKey] = useState<keyof T | string>(defaultSortKey);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(defaultSortDirection);
 
@@ -88,6 +89,7 @@ const DataTable = <T extends { id: any }>({
 
   useEffect(() => {
     setPageSize(initialPageSize);
+    setInputValue(String(initialPageSize));
   }, [initialPageSize]);
 
   const handleSort = (key: keyof T | string) => {
@@ -111,9 +113,17 @@ const DataTable = <T extends { id: any }>({
   };
 
   const handlePageSizeInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value, 10);
+    setInputValue(e.target.value);
+  };
+
+  const handlePageSizeBlur = () => {
+    const value = parseInt(inputValue, 10);
     if (!isNaN(value) && value > 0) {
       handlePageSizeChange(value);
+      setInputValue(String(value));
+    } else {
+      handlePageSizeChange(5);
+      setInputValue('5');
     }
   };
 
@@ -213,9 +223,9 @@ const DataTable = <T extends { id: any }>({
             <label className="text-sm text-slate-600">Cant Reg:</label>
             <input
               type="number"
-              value={pageSize}
+              value={inputValue}
               onChange={handlePageSizeInput}
-              onBlur={(e) => handlePageSizeChange(parseInt(e.target.value, 10) || 5)}
+              onBlur={handlePageSizeBlur}
               min={1}
               max={999}
               className="w-20 px-2 py-1 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-colors text-center"

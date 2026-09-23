@@ -5,7 +5,7 @@
 INSERT INTO appointment_statuses (code, description) VALUES
     ('PENDIENTE', 'Cita pendiente'),
     ('CONFIRMADA', 'Cita confirmada'),
-    ('COMPLETADA', 'Cita completada'),
+    ('ATENDIDA', 'Cita atendida'),
     ('CANCELADA', 'Cita cancelada'),
     ('SUSPENDIDA', 'Cita suspendida'),
     ('REAGENDADA', 'Cita reagendada')

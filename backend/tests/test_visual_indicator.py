@@ -40,7 +40,7 @@ def mock_config():
         "delayed": MockVisualConfig("delayed", "Demorada", "#EF4444", 0),
         "pending": MockVisualConfig("pending", "Pendiente", "#6B7280", 10),
         "confirmed": MockVisualConfig("confirmed", "Confirmada", "#3B82F6", 5),
-        "completed": MockVisualConfig("completed", "Completada", "#10B981", 20),
+        "attended": MockVisualConfig("attended", "Atendida", "#10B981", 20),
         "cancelled": MockVisualConfig("cancelled", "Cancelada", "#EF4444", 30),
         "rescheduled": MockVisualConfig("rescheduled", "Reagendada", "#F59E0B", 15),
     }
@@ -86,12 +86,12 @@ class TestComputeVisualIndicator:
         assert code == "delayed"
         assert is_delayed is True
     
-    def test_completed_not_delayed(self, mock_config, now):
-        """COMPLETADA nunca esta delayed"""
+    def test_attended_not_delayed(self, mock_config, now):
+        """ATENDIDA nunca esta delayed"""
         from core.crud_visual_indicator import compute_visual_indicator
-        appt = MockAppointment(1, "COMPLETADA", now - timedelta(minutes=20))
+        appt = MockAppointment(1, "ATENDIDA", now - timedelta(minutes=20))
         code, is_delayed = compute_visual_indicator(appt, mock_config)
-        assert code == "completed"
+        assert code == "attended"
         assert is_delayed is False
     
     def test_cancelled_not_delayed(self, mock_config, now):
@@ -118,12 +118,12 @@ class TestConstants:
         assert "CONFIRMADA" in STATUSES_THAT_OCCUPY
         assert "REAGENDADA" in STATUSES_THAT_OCCUPY
         assert "CANCELADA" not in STATUSES_THAT_OCCUPY
-        assert "COMPLETADA" not in STATUSES_THAT_OCCUPY
+        assert "ATENDIDA" not in STATUSES_THAT_OCCUPY
     
     def test_terminal_statuses(self):
         from core.crud_visual_indicator import TERMINAL_STATUSES
         assert "CANCELADA" in TERMINAL_STATUSES
-        assert "COMPLETADA" in TERMINAL_STATUSES
+        assert "ATENDIDA" in TERMINAL_STATUSES
         assert "PENDIENTE" not in TERMINAL_STATUSES
         assert "CONFIRMADA" not in TERMINAL_STATUSES
 
@@ -141,7 +141,7 @@ class TestEnrichAppointmentsWithVisuals:
             "delayed": MockVisualConfig("delayed", "Demorada", "#EF4444", 0),
             "pending": MockVisualConfig("pending", "Pendiente", "#6B7280", 10),
             "confirmed": MockVisualConfig("confirmed", "Confirmada", "#3B82F6", 5),
-            "completed": MockVisualConfig("completed", "Completada", "#10B981", 20),
+"attended": MockVisualConfig("attended", "Atendida", "#10B981", 20),
             "cancelled": MockVisualConfig("cancelled", "Cancelada", "#EF4444", 30),
             "rescheduled": MockVisualConfig("rescheduled", "Reagendada", "#F59E0B", 15),
         }
@@ -237,17 +237,17 @@ class TestConstants:
         assert "CONFIRMADA" in STATUSES_THAT_OCCUPY
         assert "REAGENDADA" in STATUSES_THAT_OCCUPY
         assert "CANCELADA" not in STATUSES_THAT_OCCUPY
-        assert "COMPLETADA" not in STATUSES_THAT_OCCUPY
+        assert "ATENDIDA" not in STATUSES_THAT_OCCUPY
     
     def test_disabled_group_is_excluded(self):
         from core.crud_visual_indicator import STATUSES_THAT_OCCUPY
         assert "CANCELADA" not in STATUSES_THAT_OCCUPY
-        assert "COMPLETADA" not in STATUSES_THAT_OCCUPY
+        assert "ATENDIDA" not in STATUSES_THAT_OCCUPY
     
     def test_terminal_statuses(self):
         from core.crud_visual_indicator import TERMINAL_STATUSES
         assert "CANCELADA" in TERMINAL_STATUSES
-        assert "COMPLETADA" in TERMINAL_STATUSES
+        assert "ATENDIDA" in TERMINAL_STATUSES
         assert "PENDIENTE" not in TERMINAL_STATUSES
         assert "CONFIRMADA" not in TERMINAL_STATUSES
     

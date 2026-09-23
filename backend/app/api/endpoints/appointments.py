@@ -1,13 +1,16 @@
 from typing import Any, Optional
 import asyncio
 import uuid
+from datetime import datetime
 
 from dependencies import get_current_user, get_db
 from dependencies_i18n import I18nResponse, get_language
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from schemas.appointment import (
     AppointmentCreate,
     AppointmentOut,
+    AppointmentStatusCode,
     AppointmentStatusUpdate,
     AppointmentUpdate,
     MedicalNoteCreate,
@@ -21,8 +24,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core import crud_appointment, crud_doctor, crud_medical_note, crud_patient
 from core.crud_notification import create_notification
 from models.user import User as UserModel
-
-router = APIRouter(prefix="/api/v1", tags=["Appointments"])
 
 router = APIRouter(prefix="/api/v1", tags=["Appointments"])
 
@@ -215,6 +216,190 @@ async def change_appointment_status(
         return await crud_appointment.change_status(db, db_appointment, cambio)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+# --- New specific transition endpoints ---
+
+class ConfirmAppointmentRequest(BaseModel):
+    pass
+
+@router.post(
+    "/appointments/{appointment_id}/confirm",
+    response_model=AppointmentOut,
+    summary="Confirm a PENDING appointment",
+    responses={400: {"description": "Invalid transition"}, 404: {"description": "Not found"}},
+)
+async def confirm_appointment(
+    *,
+    db: AsyncSession = Depends(get_db),
+    appointment_id: int,
+    current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
+) -> AppointmentOut:
+    """Confirm a PENDING appointment. Can be done by patient, doctor, or staff."""
+    i18n = I18nResponse(language)
+    db_appointment = await crud_appointment.get_appointment(db, appointment_id, user_id=current_user.id)
+    if not db_appointment:
+        raise i18n.error("appointment_not_found", status_code=404)
+    try:
+        return await crud_appointment.confirm_appointment(db, db_appointment, current_user)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class AttendAppointmentRequest(BaseModel):
+    notes: str | None = None
+    duration_minutes: int | None = None
+
+@router.post(
+    "/appointments/{appointment_id}/attend",
+    response_model=AppointmentOut,
+    summary="Mark appointment as ATTENDED (doctor only)",
+    responses={400: {"description": "Invalid transition or timing"}, 404: {"description": "Not found"}},
+)
+async def attend_appointment(
+    *,
+    db: AsyncSession = Depends(get_db),
+    appointment_id: int,
+    request: AttendAppointmentRequest,
+    current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
+) -> AppointmentOut:
+    """Mark appointment as ATTENDED. Only doctors can do this. Creates medical note if notes provided."""
+    i18n = I18nResponse(language)
+    db_appointment = await crud_appointment.get_appointment(db, appointment_id, user_id=current_user.id)
+    if not db_appointment:
+        raise i18n.error("appointment_not_found", status_code=404)
+    try:
+        return await crud_appointment.attend_appointment(
+            db, db_appointment, current_user, 
+            notes=request.notes, duration_minutes=request.duration_minutes
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class SuspendAppointmentRequest(BaseModel):
+    reason: str | None = None
+
+@router.post(
+    "/appointments/{appointment_id}/suspend",
+    response_model=AppointmentOut,
+    summary="Suspend an appointment",
+    responses={400: {"description": "Invalid transition"}, 404: {"description": "Not found"}},
+)
+async def suspend_appointment(
+    *,
+    db: AsyncSession = Depends(get_db),
+    appointment_id: int,
+    request: SuspendAppointmentRequest,
+    current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
+) -> AppointmentOut:
+    """Suspend an appointment. Can be done by doctor or staff."""
+    i18n = I18nResponse(language)
+    db_appointment = await crud_appointment.get_appointment(db, appointment_id, user_id=current_user.id)
+    if not db_appointment:
+        raise i18n.error("appointment_not_found", status_code=404)
+    try:
+        return await crud_appointment.suspend_appointment(db, db_appointment, current_user, reason=request.reason)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class CancelAppointmentRequest(BaseModel):
+    reason: str | None = None
+
+@router.post(
+    "/appointments/{appointment_id}/cancel",
+    response_model=AppointmentOut,
+    summary="Cancel an appointment",
+    responses={400: {"description": "Invalid transition or past appointment"}, 404: {"description": "Not found"}},
+)
+async def cancel_appointment(
+    *,
+    db: AsyncSession = Depends(get_db),
+    appointment_id: int,
+    request: CancelAppointmentRequest,
+    current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
+) -> AppointmentOut:
+    """Cancel an appointment. Can be done by patient or staff. Not allowed for past appointments."""
+    i18n = I18nResponse(language)
+    db_appointment = await crud_appointment.get_appointment(db, appointment_id, user_id=current_user.id)
+    if not db_appointment:
+        raise i18n.error("appointment_not_found", status_code=404)
+    try:
+        return await crud_appointment.cancel_appointment(db, db_appointment, current_user, reason=request.reason)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post(
+    "/appointments/{appointment_id}/reactivate",
+    response_model=AppointmentOut,
+    summary="Reactivate a CANCELLED appointment (if date is in future)",
+    responses={400: {"description": "Invalid transition or past appointment"}, 404: {"description": "Not found"}},
+)
+async def reactivate_appointment(
+    *,
+    db: AsyncSession = Depends(get_db),
+    appointment_id: int,
+    current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
+) -> AppointmentOut:
+    """Reactivate a CANCELLED appointment back to PENDING. Only if date is in future."""
+    i18n = I18nResponse(language)
+    db_appointment = await crud_appointment.get_appointment(db, appointment_id, user_id=current_user.id)
+    if not db_appointment:
+        raise i18n.error("appointment_not_found", status_code=404)
+    try:
+        return await crud_appointment.reactivate_appointment(db, db_appointment, current_user)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class BulkRescheduleRequest(BaseModel):
+    doctor_id: int
+    date: str  # YYYY-MM-DD
+    criteria: str = "earliest_first"  # earliest_first | priority
+
+@router.post(
+    "/appointments/bulk-reschedule",
+    summary="AI bulk reschedule for specialist's day",
+    responses={400: {"description": "Invalid data"}, 404: {"description": "Doctor not found"}},
+)
+async def bulk_reschedule(
+    *,
+    db: AsyncSession = Depends(get_db),
+    request: BulkRescheduleRequest,
+    current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
+) -> dict:
+    """AI bulk reschedule for specialist's day. Reassigns all appointments to available slots."""
+    i18n = I18nResponse(language)
+    try:
+        target_date = datetime.strptime(request.date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+    return await crud_appointment.ai_bulk_reschedule(
+        db, request.doctor_id, target_date, request.criteria
+    )
+
+
+# --- Batch job endpoint (for scheduler/cron) ---
+@router.post(
+    "/appointments/auto-cancel-no-show",
+    summary="Batch job: Auto-cancel no-show appointments (run daily at 02:00)",
+)
+async def auto_cancel_no_show(
+    *,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+) -> dict:
+    """Auto-cancel appointments from previous days that were not attended. For scheduler use."""
+    count = await crud_appointment.auto_cancel_no_show_appointments(db)
+    return {"cancelled": count}
 
 
 @router.delete(

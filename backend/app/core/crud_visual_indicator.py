@@ -15,14 +15,14 @@ STATUS_TO_VISUAL_CODE = {
     "CONFIRMADA": "confirmed",
     "REAGENDADA": "rescheduled",
     "CANCELADA": "cancelled",
-    "COMPLETADA": "completed",
+    "ATENDIDA": "attended",
 }
 
 # Constantes para estados que ocupan agenda (bloquean horario)
 STATUSES_THAT_OCCUPY = {"PENDIENTE", "CONFIRMADA", "REAGENDADA"}
 
 # Estados terminales: no se pueden reprogramar desde aquí
-TERMINAL_STATUSES = {"CANCELADA", "COMPLETADA"}
+TERMINAL_STATUSES = {"CANCELADA", "ATENDIDA"}
 
 # Tolerancia por defecto para considerar demora (minutos)
 DEFAULT_DELAY_TOLERANCE_MINUTES = 15
@@ -84,7 +84,7 @@ async def get_all_visual_configs(db: AsyncSession) -> list:
 STATUSES_THAT_OCCUPY = {"PENDIENTE", "CONFIRMADA", "REAGENDADA"}
 
 # Estados terminales: no se pueden reprogramar desde aquí
-TERMINAL_STATUSES = {"CANCELADA", "COMPLETADA"}
+TERMINAL_STATUSES = {"CANCELADA", "ATENDIDA"}
 
 # Tolerancia por defecto para considerar demora (minutos)
 DEFAULT_DELAY_TOLERANCE_MINUTES = 15
@@ -112,7 +112,7 @@ def get_visual_code(status_code: str) -> str:
         "CONFIRMADA": "confirmed",
         "REAGENDADA": "rescheduled",
         "CANCELADA": "cancelled",
-        "COMPLETADA": "completed",
+        "ATENDIDA": "attended",
     }.get(status_code, status_code.lower())
 
 
@@ -228,7 +228,7 @@ async def enrich_appointments_with_visuals(
                 "CONFIRMADA": "confirmed",
                 "REAGENDADA": "rescheduled",
                 "CANCELADA": "cancelled",
-                "COMPLETADA": "completed",
+                "ATENDIDA": "attended",
             }.get(status_code, status_code.lower())
             appt.is_delayed = False
         
