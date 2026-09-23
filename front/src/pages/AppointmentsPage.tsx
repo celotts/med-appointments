@@ -35,7 +35,7 @@ const toLocalInput = (iso?: string) => {
 
 const AppointmentsPage: React.FC = () => {
   const { user } = useAuth();
-  const isAdminOrSuperAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isAdminOrSuperAdmin = user?.role === 'admin' || user?.role === 'super-admin';
   const isSpecialist = user?.role === 'specialist' || user?.role === 'doctor';
   const isAssistant = user?.role === 'assistant';
 

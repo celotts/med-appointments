@@ -160,7 +160,7 @@ async def update_appointment(
     current_user: UserModel = Depends(get_current_user),
     language: str = Depends(get_language),
 ) -> AppointmentOut:
-    """Reschedules an appointment and transitions it to RESCHEDULED status."""
+    """Updates appointment details (time, reason) without changing status."""
     i18n = I18nResponse(language)
     db_appointment = await crud_appointment.get_appointment(
         db, appointment_id, user_id=current_user.id
@@ -168,20 +168,8 @@ async def update_appointment(
     if not db_appointment:
         raise i18n.error("appointment_not_found", status_code=404)
     try:
-        appt = await crud_appointment.reschedule_appointment(
+        appt = await crud_appointment.update_appointment(
             db, db_appointment, appointment_in
-        )
-        doctor = await crud_doctor.get_doctor(db, db_appointment.doctor_id)
-        patient = await crud_patient.get_patient(db, db_appointment.patient_id)
-        dname = f"{doctor.first_name} {doctor.last_name}" if doctor else "Doctor"
-        pname = f"{patient.first_name} {patient.last_name}" if patient else "Paciente"
-        asyncio.create_task(
-            create_notification(
-                db_appointment.patient_id,
-                "appointment_rescheduled",
-                "Cita reagendada",
-                f"Hola {pname}, tu cita con {dname} fue reagendada para {appt.start_datetime}.",
-            )
         )
         return appt
     except ValueError as exc:

@@ -24,11 +24,14 @@ const LoginPage: React.FC = () => {
       let userData;
       try {
         const me = await authApi.getMe();
+        const roleName = me.role?.name || me.role || 'user';
+        // Normalizar roles para comparación en frontend
+        const normalizedRole = roleName.toLowerCase().replace('_', '-');
         userData = {
           id: me.id,
           email: me.email,
           full_name: me.full_name || me.email.split('@')[0],
-          role: me.role || 'user',
+          role: normalizedRole,
         };
       } catch {
         userData = {
