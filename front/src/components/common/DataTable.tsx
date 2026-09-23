@@ -114,6 +114,8 @@ const DataTable = <T extends { id: any }>({
     const value = parseInt(e.target.value, 10);
     if (!isNaN(value) && value > 0) {
       handlePageSizeChange(value);
+    } else if (e.target.value === '') {
+      handlePageSizeChange(5);
     }
   };
 
