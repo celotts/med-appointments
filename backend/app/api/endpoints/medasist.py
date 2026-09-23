@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from dependencies import get_current_user, get_db
 from fastapi import APIRouter, Depends, HTTPException
@@ -76,8 +76,8 @@ async def _find_free_slots(
     target_date: datetime,
     duration_minutes: int,
 ) -> list[AvailabilitySlot]:
-    day_start = target_date.replace(hour=9, minute=0, second=0, microsecond=0)
-    day_end = target_date.replace(hour=17, minute=0, second=0, microsecond=0)
+    day_start = target_date.replace(hour=9, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
+    day_end = target_date.replace(hour=17, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
 
     result = await db.execute(
         select(Appointment).where(
