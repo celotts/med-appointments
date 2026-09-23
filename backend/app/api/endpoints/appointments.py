@@ -1,4 +1,6 @@
 from typing import Any, Optional
+import asyncio
+import uuid
 
 from dependencies import get_current_user, get_db
 from dependencies_i18n import I18nResponse, get_language
@@ -17,7 +19,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core import crud_appointment, crud_doctor, crud_medical_note, crud_patient
+from core.crud_notification import create_notification
 from models.user import User as UserModel
+
+router = APIRouter(prefix="/api/v1", tags=["Appointments"])
 
 router = APIRouter(prefix="/api/v1", tags=["Appointments"])
 
@@ -34,10 +39,17 @@ async def list_appointments(
     patient_id: int | None = None,
     doctor_id: int | None = None,
     status: str | None = None,
+    assistant_specialist_ids: str | None = Query(None, description="Comma-separated list of specialist IDs"),
     enrich_visuals: bool = Query(True, description="Enrich with visual indicators (delayed, proximity)"),
     current_user: UserModel = Depends(get_current_user),
 ) -> PaginatedResponse:
     """List of appointments with pagination, optional filters by patient, doctor, and status."""
+    specialist_ids: list[uuid.UUID] | None = None
+    if assistant_specialist_ids:
+        try:
+            specialist_ids = [uuid.UUID(s.strip()) for s in assistant_specialist_ids.split(",") if s.strip()]
+        except (ValueError, AttributeError):
+            specialist_ids = None
     result = await crud_appointment.get_appointments_paginated(
         db,
         page=page,
@@ -46,6 +58,7 @@ async def list_appointments(
         doctor_id=doctor_id,
         status=status,
         user_id=current_user.id,
+        assistant_specialist_ids=specialist_ids,
         enrich_visuals=enrich_visuals,
     )
     return PaginatedResponse(**result)
@@ -77,9 +90,22 @@ async def create_appointment(
     if not await crud_doctor.get_doctor(db, appointment_in.doctor_id):
         raise i18n.error("doctor_not_found", status_code=404)
     try:
-        return await crud_appointment.create_appointment(
+        appt = await crud_appointment.create_appointment(
             db, appointment=appointment_in, user_id=current_user.id
         )
+        doctor = await crud_doctor.get_doctor(db, appointment_in.doctor_id)
+        patient = await crud_patient.get_patient(db, appointment_in.patient_id)
+        dname = f"{doctor.first_name} {doctor.last_name}" if doctor else "Doctor"
+        pname = f"{patient.first_name} {patient.last_name}" if patient else "Paciente"
+        asyncio.create_task(
+            create_notification(
+                appointment_in.patient_id,
+                "appointment_created",
+                "Cita programada",
+                f"Hola {pname}, tienes una cita con {dname} el {appt.start_datetime}.",
+            )
+        )
+        return appt
     except ValueError as exc:
         if "at that time" in str(exc):
             raise i18n.error("appointment_already_exists", status_code=409) from exc
@@ -141,9 +167,22 @@ async def update_appointment(
     if not db_appointment:
         raise i18n.error("appointment_not_found", status_code=404)
     try:
-        return await crud_appointment.reschedule_appointment(
+        appt = await crud_appointment.reschedule_appointment(
             db, db_appointment, appointment_in
         )
+        doctor = await crud_doctor.get_doctor(db, db_appointment.doctor_id)
+        patient = await crud_patient.get_patient(db, db_appointment.patient_id)
+        dname = f"{doctor.first_name} {doctor.last_name}" if doctor else "Doctor"
+        pname = f"{patient.first_name} {patient.last_name}" if patient else "Paciente"
+        asyncio.create_task(
+            create_notification(
+                db_appointment.patient_id,
+                "appointment_rescheduled",
+                "Cita reagendada",
+                f"Hola {pname}, tu cita con {dname} fue reagendada para {appt.start_datetime}.",
+            )
+        )
+        return appt
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

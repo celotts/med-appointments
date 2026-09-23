@@ -28,13 +28,17 @@ class UserInDBBase(UserBase):
         from_attributes = True
 
 
-class User(UserInDBBase):
-    pass
-
-
 class Role(BaseModel):
     id: uuid.UUID
     name: str
+
+    class Config:
+        from_attributes = True
+
+
+class User(UserInDBBase):
+    role: Role
+    is_active: bool
 
     class Config:
         from_attributes = True

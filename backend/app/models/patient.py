@@ -13,6 +13,7 @@ from .medical_history import MedicalHistory
 if TYPE_CHECKING:
     from .appointment import Appointment
     from .waitlist import Waitlist
+    from .notification import Notification
 
 
 def _get_appointment():
@@ -23,6 +24,13 @@ def _get_appointment():
 def _get_waitlist():
     from .waitlist import Waitlist
     return Waitlist
+
+
+def _get_notification():
+    from .notification import Notification
+    return Notification
+
+
 class Patient(Base):
     __tablename__ = "patients"
 
@@ -47,4 +55,7 @@ class Patient(Base):
     )
     medical_histories: Mapped[list["MedicalHistory"]] = relationship(
         MedicalHistory, back_populates="patient"
+    )
+    notifications: Mapped[list["Notification"]] = relationship(
+        _get_notification, back_populates="patient"
     )

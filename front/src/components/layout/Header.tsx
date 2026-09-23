@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { LogOut, User, ChevronDown } from 'lucide-react';
+import NotificationBell from '../common/NotificationBell';
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -14,6 +15,7 @@ const Header: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-4">
+        <NotificationBell />
         <div className="flex items-center gap-3 pl-4 border-l border-medical-textMuted/30">
           <div className="h-9 w-9 bg-medical-primary rounded-full flex items-center justify-center text-white">
             <User size={18} />

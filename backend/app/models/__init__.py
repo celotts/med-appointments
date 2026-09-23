@@ -1,5 +1,6 @@
 from app.core.db import Base as Base
 
+from .assistant_specialist import AssistantSpecialist as AssistantSpecialist
 from .doctor_schedule import DoctorSchedule as DoctorSchedule
 from .specialty import Specialty as Specialty
 from .doctor import Doctor as Doctor
@@ -15,3 +16,4 @@ from .consulting_room import ConsultingRoom as ConsultingRoom
 from .medical_history import MedicalHistory as MedicalHistory
 from .waitlist import Waitlist as Waitlist
 from .visual_indicator import VisualIndicatorConfig as VisualIndicatorConfig
+from .notification import Notification as Notification

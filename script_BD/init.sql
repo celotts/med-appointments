@@ -230,6 +230,20 @@ INSERT INTO roles (id, name, created_by_user_id)
 VALUES ('00000000-0000-0000-0000-000000000002', 'SUPER_ADMIN', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
 
 
+INSERT INTO roles (id, name, created_by_user_id)
+VALUES ('00000000-0000-0000-0000-000000000003', 'ASSISTANT', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
+
+
+CREATE TABLE assistant_specialists (
+    assistant_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    specialist_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (assistant_id, specialist_id)
+);
+
+CREATE INDEX idx_assistant_specialists_specialist ON assistant_specialists(specialist_id);
+
+
 -- Los catálogos (estados de cita, especialidades) y los datos de ejemplo NO se
 -- cargan aquí: la BD queda con las tablas vacías. Se cargan solo cuando se
 -- piden, con:  make up-test   (levanta + datos)   o   make seed   (solo datos)
@@ -375,3 +389,19 @@ CREATE TABLE medical_histories (
 CREATE INDEX idx_doctor_schedules_doctor ON doctor_schedules(doctor_id);
 CREATE INDEX idx_medical_histories_patient ON medical_histories(patient_id);
 CREATE INDEX idx_medical_histories_doctor ON medical_histories(doctor_id);
+
+
+CREATE TABLE notifications (
+    id SERIAL PRIMARY KEY,
+    patient_id INT NOT NULL,
+    type VARCHAR(20) NOT NULL,
+    title VARCHAR(120) NOT NULL,
+    message TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_notifications_patient FOREIGN KEY (patient_id)
+        REFERENCES patients (id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_notifications_patient ON notifications(patient_id);
+CREATE INDEX idx_notifications_is_read ON notifications(is_read);

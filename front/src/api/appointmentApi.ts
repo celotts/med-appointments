@@ -44,7 +44,7 @@ export const appointmentApi = {
   async getAll(
     page = 1,
     pageSize = 20,
-    filters?: { patient_id?: number; doctor_id?: number; status?: string }
+    filters?: { patient_id?: number; doctor_id?: number; status?: string; assistant_specialist_ids?: string }
   ): Promise<PaginatedResponse<Appointment>> {
     const params = { page, page_size: pageSize, ...filters };
     const response = await axiosInstance.get('/appointments/', { params });

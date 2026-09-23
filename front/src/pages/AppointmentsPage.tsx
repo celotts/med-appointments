@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
+import axiosInstance from '../api/axiosInstance';
 import { appointmentApi, Appointment, AppointmentCreate, AppointmentStatus, PaginatedResponse } from '../api/appointmentApi';
 import { patientApi, Patient } from '../api/patientApi';
 import { doctorApi, Doctor } from '../api/doctorApi';
@@ -33,8 +34,9 @@ const toLocalInput = (iso?: string) => {
 
 const AppointmentsPage: React.FC = () => {
   const { user } = useAuth();
-  const isAdminOrSuperAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'admin';
+  const isAdminOrSuperAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const isSpecialist = user?.role === 'specialist' || user?.role === 'doctor';
+  const isAssistant = user?.role === 'assistant';
 
   const [patients, setPatients] = useState<Patient[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -44,10 +46,12 @@ const AppointmentsPage: React.FC = () => {
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<string>('all');
-  
+  const [assignedSpecialists, setAssignedSpecialists] = useState<Doctor[]>([]);
+  const [selectedSpecialist, setSelectedSpecialist] = useState<number | null>(null);
+
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(5);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -89,21 +93,35 @@ const AppointmentsPage: React.FC = () => {
     } catch (error) {
       toast.error('Error al cargar datos de referencia');
     }
-  }, [isAdminOrSuperAdmin, isSpecialist, user?.id]);
+  }, [isAdminOrSuperAdmin, isSpecialist, isAssistant, user?.id]);
+
+  // Load assigned specialists for assistant
+  const loadAssignedSpecialists = useCallback(async () => {
+    if (!isAssistant || !user?.id) return;
+    try {
+      const response = await axiosInstance.get(`/assistants/${user.id}/specialists`);
+      setAssignedSpecialists(response.data);
+    } catch (error) {
+      toast.error('Error al cargar especialistas asignados');
+    }
+  }, [isAssistant, user?.id]);
 
   // Load appointments with server-side pagination
   const loadAppointments = useCallback(async () => {
     try {
       setIsLoading(true);
       
-      // Determine page size: larger when searching to allow client-side filtering
       const fetchPageSize = searchTerm ? 100 : pageSize;
       
-      const filters: { status?: string } = {};
+      const filters: { status?: string; assistant_specialist_ids?: string } = {};
       if (activeFilter !== 'all') {
         filters.status = activeFilter;
       }
-      if (!isAdminOrSuperAdmin && isSpecialist) {
+      if (isAssistant && selectedSpecialist) {
+        filters.assistant_specialist_ids = String(selectedSpecialist);
+      } else if (isAssistant && assignedSpecialists.length > 0) {
+        filters.assistant_specialist_ids = assignedSpecialists.map((d) => String(d.id)).join(',');
+      } else if (!isAdminOrSuperAdmin && isSpecialist) {
         // For specialists, the backend already filters by user_id
       }
 
@@ -126,12 +144,13 @@ const AppointmentsPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, pageSize, searchTerm, activeFilter, isAdminOrSuperAdmin, isSpecialist]);
+  }, [currentPage, pageSize, searchTerm, activeFilter, isAdminOrSuperAdmin, isSpecialist, isAssistant, selectedSpecialist]);
 
   // Load reference data on mount
   useEffect(() => {
     loadReferenceData();
-  }, [loadReferenceData]);
+    loadAssignedSpecialists();
+  }, [loadReferenceData, loadAssignedSpecialists]);
 
   // Load appointments when pagination/filter changes
   useEffect(() => {
@@ -141,7 +160,7 @@ const AppointmentsPage: React.FC = () => {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, activeFilter]);
+  }, [searchTerm, activeFilter, pageSize]);
 
   const patientName = (id: number) => {
     const p = patients.find((x) => x.id === id);
@@ -441,6 +460,21 @@ const AppointmentsPage: React.FC = () => {
           </div>
 
           <FilterButtons activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+          {isAssistant && (
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-medical-textMain mb-1">Especialista asignado</label>
+              <select
+                value={selectedSpecialist || ''}
+                onChange={(e) => setSelectedSpecialist(Number(e.target.value) || null)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
+              >
+                <option value="">Todos los especialistas</option>
+                {assignedSpecialists.map((d) => (
+                  <option key={d.id} value={d.id}>Dr. {d.first_name} {d.last_name}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         {isLoading ? (
@@ -455,6 +489,7 @@ const AppointmentsPage: React.FC = () => {
             onEdit={openEdit}
             onDelete={handleDelete}
             pageSize={pageSize}
+            onPageSizeChange={setPageSize}
             // Pass pagination info for server-side pagination display
             defaultSortKey="start_datetime"
             defaultSortDirection="desc"

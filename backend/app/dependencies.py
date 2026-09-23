@@ -35,4 +35,6 @@ async def get_current_user(
     user = await crud_user.get_user(db, user_id=user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
+    if not user.is_active:
+        raise HTTPException(status_code=401, detail="User is inactive.")
     return user

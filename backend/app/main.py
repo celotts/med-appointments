@@ -11,6 +11,7 @@ from typing import Any  # noqa: E402
 from api.endpoints import (  # noqa: E402
     appointment_statuses,
     appointments,
+    assistants,
     consulting_rooms,
     doctor_schedules,
     doctors,
@@ -94,6 +95,7 @@ app.include_router(
     tags=["Appointment Statuses"],
 )
 app.include_router(appointments.router)
+app.include_router(assistants.router)
 app.include_router(rag.router)
 
 # Visual Indicators - manually add routes with proper prefix

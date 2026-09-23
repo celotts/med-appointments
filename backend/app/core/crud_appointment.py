@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -107,17 +108,19 @@ async def get_appointments_paginated(
     doctor_id: int | None = None,
     status: str | None = None,
     user_id: str | None = None,
+    assistant_specialist_ids: list[uuid.UUID] | None = None,
     enrich_visuals: bool = True,
 ) -> dict:
     """Get appointments with pagination info (items + total count)."""
     skip = (page - 1) * page_size
     
-    # Base query with filters
     base_stmt = select(AppointmentModel)
     if patient_id is not None:
         base_stmt = base_stmt.where(AppointmentModel.patient_id == patient_id)
     if doctor_id is not None:
         base_stmt = base_stmt.where(AppointmentModel.doctor_id == doctor_id)
+    if assistant_specialist_ids:
+        base_stmt = base_stmt.where(AppointmentModel.doctor_id.in_(assistant_specialist_ids))
     if status is not None:
         sub = select(AppointmentStatusModel.id).where(
             AppointmentStatusModel.code == status

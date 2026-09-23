@@ -13,6 +13,7 @@ interface DataTableProps<T> {
   onEdit?: (item: T) => void;
   onDelete?: (item: T) => void;
   pageSize?: number;
+  onPageSizeChange?: (pageSize: number) => void;
   defaultSortKey?: keyof T | string;
   defaultSortDirection?: 'asc' | 'desc';
 }
@@ -51,6 +52,7 @@ const DataTable = <T extends { id: any }>({
   onEdit,
   onDelete,
   pageSize: initialPageSize = 20,
+  onPageSizeChange,
   defaultSortKey = 'start_datetime',
   defaultSortDirection = 'desc',
 }: DataTableProps<T>) => {
@@ -84,6 +86,10 @@ const DataTable = <T extends { id: any }>({
     setCurrentPage(1);
   }, [pageSize, data.length]);
 
+  useEffect(() => {
+    setPageSize(initialPageSize);
+  }, [initialPageSize]);
+
   const handleSort = (key: keyof T | string) => {
     if (sortKey === key) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -97,6 +103,7 @@ const DataTable = <T extends { id: any }>({
     const validSize = Math.max(1, Math.min(newPageSize, data.length || 1000));
     setPageSize(validSize);
     setCurrentPage(1);
+    onPageSizeChange?.(validSize);
   };
 
   const goToPage = (page: number) => {
@@ -113,11 +120,11 @@ const DataTable = <T extends { id: any }>({
   const getSortIcon = (columnAccessor: keyof T | ((item: T) => React.ReactNode)) => {
     if (typeof columnAccessor === 'function') return null;
     if (sortKey !== columnAccessor) {
-      return <svg className="w-3 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4 4-4M3 8l4 4 4-4M3 16l4-4 4 4" /></svg>;
+      return <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4m0 0l4-4m-4 4h18M3 8l4 4m0-4l-4 4h18" /></svg>;
     }
-    return sortDirection === 'asc' 
-      ? <svg className="w-3 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7-7" /></svg>
-      : <svg className="w-3 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 5l-7 7-7 7" /></svg>;
+    return sortDirection === 'asc'
+      ? <svg className="w-4 h-4 text-medical-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+      : <svg className="w-4 h-4 text-medical-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>;
   };
 
   return (
