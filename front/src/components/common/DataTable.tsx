@@ -114,8 +114,6 @@ const DataTable = <T extends { id: any }>({
     const value = parseInt(e.target.value, 10);
     if (!isNaN(value) && value > 0) {
       handlePageSizeChange(value);
-    } else if (e.target.value === '') {
-      handlePageSizeChange(5);
     }
   };
 
@@ -217,7 +215,7 @@ const DataTable = <T extends { id: any }>({
               type="number"
               value={pageSize}
               onChange={handlePageSizeInput}
-              onBlur={(e) => handlePageSizeChange(parseInt(e.target.value, 10) || initialPageSize)}
+              onBlur={(e) => handlePageSizeChange(parseInt(e.target.value, 10) || 5)}
               min={1}
               max={999}
               className="w-20 px-2 py-1 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-colors text-center"
