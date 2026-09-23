@@ -86,10 +86,6 @@ const DataTable = <T extends { id: any }>({
     setCurrentPage(1);
   }, [pageSize, data.length]);
 
-  useEffect(() => {
-    setPageSize(initialPageSize);
-  }, [initialPageSize]);
-
   const handleSort = (key: keyof T | string) => {
     if (sortKey === key) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
