@@ -7,6 +7,7 @@ from schemas.user import (
     UserUpdate as UserUpdateSchema,
 )
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.security import get_password_hash, verify_password
@@ -15,8 +16,10 @@ from models.role import Role as RoleModel
 
 
 async def get_user(db: AsyncSession, user_id: uuid.UUID) -> UserModel | None:
-    """Get a user by their ID."""
-    result = await db.execute(select(UserModel).filter(UserModel.id == user_id))
+    """Get a user by their ID with role loaded."""
+    result = await db.execute(
+        select(UserModel).options(selectinload(UserModel.role)).filter(UserModel.id == user_id)
+    )
     return result.scalars().first()
 
 

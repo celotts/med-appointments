@@ -68,7 +68,7 @@ export function isAuthenticated(): boolean {
 
 // Obtener datos del usuario actual
 export async function getMe(): Promise<User> {
-  const response = await api.get('/me')
+  const response = await api.get('/api/v1/me')
   return response.data as User
 }
 

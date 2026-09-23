@@ -479,6 +479,11 @@ async def update_appointment(
     db_appointment: AppointmentModel,
     appointment: AppointmentUpdateSchema,
 ) -> AppointmentModel:
+    # Check if appointment is in a terminal state (cannot be modified)
+    from core.crud_visual_indicator import TERMINAL_STATUSES
+    if db_appointment.status.code in TERMINAL_STATUSES:
+        raise ValueError(f"Cannot modify appointment in {db_appointment.status.code} state.")
+    
     if appointment.start_datetime is not None or appointment.end_datetime is not None:
         new_start = appointment.start_datetime or db_appointment.start_datetime
         new_end = appointment.end_datetime or db_appointment.end_datetime
