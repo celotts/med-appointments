@@ -51,7 +51,7 @@ const DataTable = <T extends { id: any }>({
   columns,
   onEdit,
   onDelete,
-  pageSize: initialPageSize = 20,
+  pageSize: initialPageSize = 5,
   onPageSizeChange,
   defaultSortKey = 'start_datetime',
   defaultSortDirection = 'desc',
@@ -86,6 +86,10 @@ const DataTable = <T extends { id: any }>({
     setCurrentPage(1);
   }, [pageSize, data.length]);
 
+  useEffect(() => {
+    setPageSize(initialPageSize);
+  }, [initialPageSize]);
+
   const handleSort = (key: keyof T | string) => {
     if (sortKey === key) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -96,7 +100,7 @@ const DataTable = <T extends { id: any }>({
   };
 
   const handlePageSizeChange = (newPageSize: number) => {
-    const validSize = Math.max(1, Math.min(newPageSize, data.length || 1000));
+    const validSize = Math.max(1, Math.min(newPageSize, 999));
     setPageSize(validSize);
     setCurrentPage(1);
     onPageSizeChange?.(validSize);

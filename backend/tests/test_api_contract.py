@@ -13,7 +13,7 @@ Se ejecutan dentro del contenedor:  ``make test``
 
 from datetime import datetime, timedelta, timezone
 
-BASE = datetime(2030, 1, 1, 9, 0, tzinfo=timezone.utc)
+BASE = datetime.now(timezone.utc).replace(hour=9, minute=0, second=0, microsecond=0) + timedelta(days=1)
 
 
 # --------------------------------------------------------------------------
