@@ -141,10 +141,10 @@ const AppointmentActions: React.FC<AppointmentActionsProps> = ({
                     }}
                     disabled={loadingAction === a.action}
                     className={`${
-                      active ? 'bg-medical-primary text-white' : a.color
-                    } group flex w-full items-center rounded-md px-2 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed`}
+                      active ? 'bg-medical-primary text-white shadow-md shadow-blue-500/30' : 'bg-white ' + a.color
+                    } group flex w-full items-center rounded-md px-3 py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 hover:shadow-sm`}
                   >
-                    {loadingAction === a.action ? <Loader2 className="animate-spin mr-2" size={16} /> : <span className="mr-2">{a.icon}</span>}
+                    {loadingAction === a.action ? <Loader2 className="animate-spin mr-2" size={16} /> : <span className="mr-3">{a.icon}</span>}
                     {a.label}
                   </button>
                 )}

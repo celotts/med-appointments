@@ -95,10 +95,8 @@ const DoctorsPage: React.FC = () => {
 
   const columns = [
     { header: 'Nombre', accessor: (d: Doctor) => `Dr. ${d.first_name} ${d.last_name}` },
-    { header: 'Documento', accessor: 'document_number' as const },
     { header: 'Email', accessor: 'email' as const },
     { header: 'Telefono', accessor: (d: Doctor) => d.phone || '-' },
-    { header: 'Licencia', accessor: 'professional_license' as const },
     { header: 'Especialidad', accessor: (d: Doctor) => specialties.find((s) => s.id === d.specialty_id)?.name || '-' },
     { header: 'Sucursal', accessor: (d: Doctor) => branches.find((b) => b.id === d.branch_id)?.name || '-' },
   ];

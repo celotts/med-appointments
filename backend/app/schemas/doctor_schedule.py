@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, time
 
 from pydantic import BaseModel, Field, TypeAdapter
@@ -35,7 +36,7 @@ class DoctorScheduleUpdate(BaseModel):
 
 
 class DoctorScheduleResponse(DoctorScheduleBase):
-    id: int
+    id: uuid.UUID
     created_at: datetime
 
     class Config:

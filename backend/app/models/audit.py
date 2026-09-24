@@ -6,7 +6,7 @@ from sqlalchemy import Enum, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from core.db import Base
+from app.core.db import Base
 
 
 class AuditAction(PyEnum):

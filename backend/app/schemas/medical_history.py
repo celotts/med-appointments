@@ -7,8 +7,8 @@ from schemas import BaseSchema as BaseSchema
 
 
 class MedicalHistoryBase(BaseModel):
-    patient_id: str = Field(..., description="ID del paciente (UUID)")
-    doctor_id: str = Field(..., description="ID del médico (UUID)")
+    patient_id: int = Field(..., description="ID del paciente")
+    doctor_id: int = Field(..., description="ID del médico")
     diagnosis: str | None = Field(
         default=None, description="Diagnóstico de la consulta"
     )
@@ -25,8 +25,8 @@ class MedicalHistoryCreate(MedicalHistoryBase):
 
 
 class MedicalHistoryUpdate(BaseModel):
-    patient_id: str | None = Field(default=None, description="ID del paciente (UUID)")
-    doctor_id: str | None = Field(default=None, description="ID del médico (UUID)")
+    patient_id: int | None = Field(default=None, description="ID del paciente")
+    doctor_id: int | None = Field(default=None, description="ID del médico")
     diagnosis: str | None = Field(
         default=None, description="Diagnóstico de la consulta"
     )
@@ -37,7 +37,7 @@ class MedicalHistoryUpdate(BaseModel):
 
 
 class MedicalHistoryResponse(MedicalHistoryBase):
-    id: str
+    id: int
     created_at: dt.datetime
 
     class Config:

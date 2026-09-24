@@ -228,7 +228,7 @@ const DataTable = <T extends { id: any }>({
               onBlur={handlePageSizeBlur}
               min={1}
               max={999}
-              className="w-20 px-2 py-1 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-colors text-center"
+              className="w-20 px-2.5 py-1.5 text-sm font-medium border-2 border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-medical-primary focus:border-transparent outline-none transition-all text-center hover:border-slate-300"
               aria-label="Registros por página"
             />
           </div>
@@ -237,7 +237,7 @@ const DataTable = <T extends { id: any }>({
             <button
               onClick={() => goToPage(1)}
               disabled={currentPage === 1}
-              className="px-2 py-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors font-bold"
+              className="px-2.5 py-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors font-bold hover:shadow-sm"
               title="Primera"
               aria-label="Primera página"
             >
@@ -247,14 +247,14 @@ const DataTable = <T extends { id: any }>({
             <button
               onClick={() => goToPage(currentPage - 1)}
               disabled={currentPage === 1}
-              className="px-2 py-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors font-bold"
+              className="px-2.5 py-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors font-bold hover:shadow-sm"
               title="Anterior"
               aria-label="Página anterior"
             >
               {'<'}
             </button>
 
-            <div className="flex items-center gap-1 mx-1">
+<div className="flex items-center gap-1 mx-1">
               {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
                 let pageNum: number;
                 if (totalPages <= 5) {
@@ -270,12 +270,13 @@ const DataTable = <T extends { id: any }>({
                   <button
                     key={pageNum}
                     onClick={() => goToPage(pageNum)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 min-w-[2.25rem] ${
                       currentPage === pageNum
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-600 hover:bg-slate-100'
-                      }`}
+                        ? 'bg-medical-primary text-white shadow-md shadow-blue-500/30'
+                        : 'text-slate-600 hover:bg-slate-100 hover:shadow-sm'
+                    }`}
                     aria-current={currentPage === pageNum ? 'page' : undefined}
+                    aria-label={`Página ${pageNum}`}
                   >
                     {pageNum}
                   </button>
@@ -286,7 +287,7 @@ const DataTable = <T extends { id: any }>({
             <button
               onClick={() => goToPage(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="px-2 py-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors font-bold"
+              className="px-2.5 py-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors font-bold hover:shadow-sm"
               title="Siguiente"
               aria-label="Página siguiente"
             >
@@ -296,7 +297,7 @@ const DataTable = <T extends { id: any }>({
             <button
               onClick={() => goToPage(totalPages)}
               disabled={currentPage === totalPages}
-              className="px-2 py-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors font-bold"
+              className="px-2.5 py-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors font-bold hover:shadow-sm"
               title="Último"
               aria-label="Última página"
             >

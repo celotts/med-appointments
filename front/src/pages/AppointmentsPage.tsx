@@ -454,9 +454,9 @@ const AppointmentsPage: React.FC = () => {
         </div>
         <button
           onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2.5 bg-medical-primary text-white rounded-lg hover:bg-blue-800 transition-colors text-sm font-medium shadow-sm"
+          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 focus:ring-4 focus:ring-blue-500/30 focus:ring-offset-2 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transition-all duration-200 text-sm font-semibold"
         >
-          <Plus size={18} />
+          <Plus size={20} />
           Nueva Cita
         </button>
       </div>
@@ -468,7 +468,7 @@ const AppointmentsPage: React.FC = () => {
             <input
               type="text"
               placeholder="Buscar por paciente, doctor o motivo..."
-              className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary focus:border-transparent outline-none text-sm transition-all"
+              className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent outline-none text-sm transition-all hover:border-slate-300 bg-white"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -481,7 +481,7 @@ const AppointmentsPage: React.FC = () => {
               <select
                 value={selectedSpecialist || ''}
                 onChange={(e) => setSelectedSpecialist(Number(e.target.value) || null)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
+                className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-medical-primary focus:border-transparent outline-none text-sm transition-all hover:border-slate-300 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M6%209l6%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-right-3 bg-no-repeat pr-10"
               >
                 <option value="">Todos los especialistas</option>
                 {assignedSpecialists.map((d) => (
@@ -613,10 +613,10 @@ const AppointmentsPage: React.FC = () => {
                 type="button"
                 onClick={askAvailableSlots}
                 disabled={slotLoading}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-all disabled:opacity-60 flex items-center gap-1.5"
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 focus:ring-4 focus:ring-indigo-500/30 focus:ring-offset-2 shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:from-indigo-600 disabled:hover:to-indigo-700 flex items-center gap-2"
               >
-                {slotLoading ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} />}
-                Buscar
+                {slotLoading ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+                Buscar disponibilidad
               </button>
             </div>
             <p className="text-xs text-indigo-700/70">
@@ -638,10 +638,10 @@ const AppointmentsPage: React.FC = () => {
                     key={idx}
                     type="button"
                     onClick={() => applySlot(slot)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-indigo-200 text-indigo-800 hover:border-indigo-500 hover:bg-indigo-100 transition-all flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-white border-2 border-indigo-200 text-indigo-800 hover:border-indigo-500 hover:bg-indigo-50 hover:shadow-sm transition-all duration-200 flex items-center gap-2"
                   >
-                    <Check size={12} />
-                    {fmtTime(slot.start)} — {fmtTime(slot.end)}
+                    <Check size={14} className="text-indigo-600" />
+                    <span>{fmtTime(slot.start)} — {fmtTime(slot.end)}</span>
                   </button>
                 ))}
               </div>
@@ -652,16 +652,16 @@ const AppointmentsPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800 rounded-xl transition-all duration-200 border border-slate-200 hover:border-slate-300"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 text-sm font-medium text-white bg-medical-primary hover:bg-blue-800 rounded-lg transition-colors disabled:opacity-70 flex items-center gap-2"
+              className="px-6 py-2.5 text-sm font-semibold text-white rounded-xl transition-all duration-200 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 focus:ring-4 focus:ring-blue-500/30 focus:ring-offset-2 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:from-blue-600 disabled:hover:to-blue-700 flex items-center gap-2"
             >
-              {isSubmitting && <Loader2 className="animate-spin" size={16} />}
+              {isSubmitting && <Loader2 className="animate-spin" size={18} />}
               {editingAppointment ? 'Guardar Cambios' : 'Programar Cita'}
             </button>
           </div>
@@ -692,16 +692,16 @@ const AppointmentsPage: React.FC = () => {
                 type="date"
                 value={aiDate}
                 onChange={(e) => setAiDate(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
+                className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent outline-none text-sm transition-all hover:border-slate-300 bg-white"
               />
             </div>
             <button
               type="button"
               onClick={askAiSuggestions}
               disabled={aiLoading || !aiDate}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 transition-all disabled:opacity-60 flex items-center gap-2"
+              className="px-5 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 focus:ring-4 focus:ring-violet-500/30 focus:ring-offset-2 shadow-lg shadow-violet-500/30 hover:shadow-xl hover:shadow-violet-500/40 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:from-violet-600 disabled:hover:to-indigo-600 flex items-center gap-2"
             >
-              {aiLoading ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+              {aiLoading ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}
               Buscar horarios IA
             </button>
           </div>
@@ -714,19 +714,19 @@ const AppointmentsPage: React.FC = () => {
               {aiSuggestions.map((slot, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-3 hover:border-indigo-400 transition-all"
+                  className="flex items-center justify-between bg-white border-2 border-slate-200 rounded-xl p-3 hover:border-indigo-400 hover:shadow-sm transition-all duration-200"
                 >
                   <div>
-                    <p className="text-sm font-medium text-medical-textMain">{fmtTime(slot.start)} — {fmtTime(slot.end)}</p>
+                    <p className="text-sm font-semibold text-medical-textMain">{fmtTime(slot.start)} — {fmtTime(slot.end)}</p>
                     <p className="text-xs text-slate-500">Compatibilidad: {Math.round(slot.score * 100)}%</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => applySuggestion(slot)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-all flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 focus:ring-4 focus:ring-indigo-500/30 focus:ring-offset-2 shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 transition-all duration-200 flex items-center gap-2"
                   >
-                    <Check size={14} />
-                    Usar
+                    <Check size={16} />
+                    Usar este horario
                   </button>
                 </div>
               ))}

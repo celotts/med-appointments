@@ -340,7 +340,7 @@ INSERT INTO visual_indicator_config (code, label, hex_color, sort_order, is_acti
 --  y /medical-histories; el initdb anterior no las incluía y rompía los tests)
 -- ============================================================================
 CREATE TABLE consulting_rooms (
-    id SERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(100) NOT NULL,
     address VARCHAR(200),
     phone_number VARCHAR(15),
@@ -370,7 +370,7 @@ CREATE TABLE medical_histories (
     id SERIAL PRIMARY KEY,
     patient_id INT NOT NULL,
     doctor_id INT NOT NULL,
-    consulting_room_id INT,
+    consulting_room_id UUID,
     diagnosis TEXT,
     prescription TEXT,
     treatment TEXT,

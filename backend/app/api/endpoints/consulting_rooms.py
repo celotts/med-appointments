@@ -1,3 +1,4 @@
+import uuid
 from dependencies import get_current_user
 from fastapi import APIRouter, Depends, HTTPException
 from schemas.consulting_room import (
@@ -28,7 +29,7 @@ async def list_consulting_rooms(
 
 @router.get("/{room_id}", response_model=ConsultingRoomResponse)
 async def get_consulting_room(
-    room_id: str,
+    room_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -53,7 +54,7 @@ async def create_consulting_room(
 
 @router.put("/{room_id}", response_model=ConsultingRoomResponse)
 async def update_consulting_room(
-    room_id: str,
+    room_id: uuid.UUID,
     room: ConsultingRoomUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -68,7 +69,7 @@ async def update_consulting_room(
 
 @router.delete("/{room_id}", status_code=204)
 async def delete_consulting_room(
-    room_id: str,
+    room_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

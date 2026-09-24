@@ -11,8 +11,6 @@ async def get_medical_history(
     db: AsyncSession, history_id: str, user_id: uuid.UUID | None = None
 ) -> MedicalHistoryModel | None:
     stmt = select(MedicalHistoryModel).filter(MedicalHistoryModel.id == history_id)
-    if user_id is not None:
-        stmt = stmt.where(MedicalHistoryModel.user_id == user_id)
     result = await db.execute(stmt)
     return result.scalars().first()
 
@@ -21,8 +19,6 @@ async def get_medical_histories(
     db: AsyncSession, skip: int = 0, limit: int = 100, user_id: uuid.UUID | None = None
 ) -> list[MedicalHistoryModel]:
     stmt = select(MedicalHistoryModel).offset(skip).limit(limit)
-    if user_id is not None:
-        stmt = stmt.where(MedicalHistoryModel.user_id == user_id)
     result = await db.execute(stmt)
     return result.scalars().all()
 
@@ -30,7 +26,7 @@ async def get_medical_histories(
 async def create_medical_history(
     db: AsyncSession, history: MedicalHistoryCreateSchema, user_id: uuid.UUID
 ) -> MedicalHistoryModel:
-    db_history = MedicalHistoryModel(**history.model_dump(), user_id=user_id)
+    db_history = MedicalHistoryModel(**history.model_dump())
     db.add(db_history)
     await db.commit()
     await db.refresh(db_history)
