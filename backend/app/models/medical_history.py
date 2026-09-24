@@ -11,8 +11,7 @@ from app.core.db import Base
 from .consulting_room import ConsultingRoom
 
 if TYPE_CHECKING:
-    from .patient import Patient
-    from .doctor import Doctor
+    pass
 
 
 class MedicalHistory(Base):

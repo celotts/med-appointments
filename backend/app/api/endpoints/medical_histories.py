@@ -1,5 +1,8 @@
+from core import crud_medical_history
+from core.db import get_db
 from dependencies import get_current_user
 from fastapi import APIRouter, Depends, HTTPException
+from models.user import User
 from schemas.medical_history import (
     MedicalHistoryCreate,
     MedicalHistoryResponse,
@@ -7,11 +10,7 @@ from schemas.medical_history import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core import crud_medical_history
-from core.db import get_db
-from models.user import User
-
-router = APIRouter(prefix="/medical-histories", tags=["Medical Histories"])
+router = APIRouter(prefix="", tags=["Medical Histories"])
 
 
 @router.get("/", response_model=list[MedicalHistoryResponse])
@@ -51,7 +50,6 @@ async def create_medical_history(
     )
 
 
-@router.put("/{history_id}", response_model=MedicalHistoryResponse)
 @router.put("/{history_id}", response_model=MedicalHistoryResponse)
 async def update_medical_history(
     history_id: str,

@@ -29,13 +29,12 @@ from api.endpoints import (  # noqa: E402
     visual_indicators,
 )
 from core.base import Base  # noqa: F401, I001, E402
+from core.config import settings  # noqa: E402
 from dependencies import get_current_user  # noqa: E402
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 from initial_data import main as init_db  # noqa: E402
-
-from core.config import settings  # noqa: E402
 
 app = FastAPI(
     title="Medical Appointments RAG API",
@@ -99,9 +98,6 @@ app.include_router(assistants.router)
 app.include_router(rag.router)
 
 # Visual Indicators - manually add routes with proper prefix
-from api.endpoints import visual_indicators
-from fastapi.routing import APIRoute
-
 for route in visual_indicators.router.routes:
     new_route = APIRoute(
         path="/api/v1/visual-indicators" + route.path,
@@ -143,15 +139,3 @@ async def get_current_user_me(
 ) -> Any:
     """Get current authenticated user."""
     return {k: v for k, v in current_user.__dict__.items() if not k.startswith("_")}
-
-
-@app.get("/")
-def read_root():
-    return {"status": "ok"}
-
-
-@app.on_event("startup")
-async def on_startup():
-    # Run initialization logic on startup
-    # This is safe because the internal logic prevents duplication
-    await init_db()

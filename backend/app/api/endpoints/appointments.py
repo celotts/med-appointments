@@ -1,16 +1,23 @@
-from typing import Any, Optional
 import asyncio
 import uuid
 from datetime import datetime
 
+from core import (
+    crud_appointment,
+    crud_doctor,
+    crud_medical_note,
+    crud_patient,
+    crud_visual_indicator,
+)
+from core.crud_notification import create_notification
 from dependencies import get_current_user, get_db
 from dependencies_i18n import I18nResponse, get_language
 from fastapi import APIRouter, Depends, HTTPException, Query
+from models.user import User as UserModel
 from pydantic import BaseModel
 from schemas.appointment import (
     AppointmentCreate,
     AppointmentOut,
-    AppointmentStatusCode,
     AppointmentStatusUpdate,
     AppointmentUpdate,
     MedicalNoteCreate,
@@ -20,10 +27,6 @@ from schemas.appointment import (
 )
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from core import crud_appointment, crud_doctor, crud_medical_note, crud_patient
-from core.crud_notification import create_notification
-from models.user import User as UserModel
 
 router = APIRouter(prefix="/api/v1", tags=["Appointments"])
 
@@ -133,12 +136,13 @@ async def get_appointment(
     )
     if not appointment:
         raise i18n.error("appointment_not_found", status_code=404)
-    
+
     if True:  # Always enrich single appointment
-        from core.crud_visual_indicator import enrich_appointments_with_visuals
-        appointments = await crud_visual_indicator.enrich_appointments_with_visuals(db, [appointment])
+        appointments = await crud_visual_indicator.enrich_appointments_with_visuals(
+            db, [appointment]
+        )
         return appointments[0]
-    
+
     return appointment
 
 
@@ -260,8 +264,11 @@ async def attend_appointment(
         raise i18n.error("appointment_not_found", status_code=404)
     try:
         return await crud_appointment.attend_appointment(
-            db, db_appointment, current_user, 
-            notes=request.notes, duration_minutes=request.duration_minutes
+            db,
+            db_appointment,
+            current_user,
+            notes=request.notes,
+            duration_minutes=request.duration_minutes,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
