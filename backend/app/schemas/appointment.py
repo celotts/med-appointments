@@ -15,6 +15,8 @@ class AppointmentStatusCode(str, Enum):
     """
     PENDING = "PENDIENTE"
     CONFIRMED = "CONFIRMADA"
+    WAITING = "EN ESPERA"
+    IN_PROGRESS = "EN PROCESO"
     ATTENDED = "ATENDIDA"
     CANCELLED = "CANCELADA"
     SUSPENDED = "SUSPENDIDA"
@@ -25,27 +27,35 @@ class AppointmentStatusCode(str, Enum):
 VALID_TRANSITIONS: dict[AppointmentStatusCode, set[AppointmentStatusCode]] = {
     AppointmentStatusCode.PENDING: {
         AppointmentStatusCode.CONFIRMED,
-        AppointmentStatusCode.ATTENDED,
         AppointmentStatusCode.CANCELLED,
         AppointmentStatusCode.SUSPENDED,
         AppointmentStatusCode.RESCHEDULED,
     },
     AppointmentStatusCode.CONFIRMED: {
-        AppointmentStatusCode.ATTENDED,
+        AppointmentStatusCode.WAITING,
         AppointmentStatusCode.CANCELLED,
         AppointmentStatusCode.SUSPENDED,
         AppointmentStatusCode.RESCHEDULED,
     },
+    AppointmentStatusCode.WAITING: {
+        AppointmentStatusCode.IN_PROGRESS,
+        AppointmentStatusCode.CANCELLED,
+        AppointmentStatusCode.SUSPENDED,
+    },
+    AppointmentStatusCode.IN_PROGRESS: {
+        AppointmentStatusCode.ATTENDED,
+        AppointmentStatusCode.CANCELLED,
+        AppointmentStatusCode.SUSPENDED,
+    },
     AppointmentStatusCode.RESCHEDULED: {
         AppointmentStatusCode.CONFIRMED,
-        AppointmentStatusCode.ATTENDED,
+        AppointmentStatusCode.WAITING,
         AppointmentStatusCode.CANCELLED,
         AppointmentStatusCode.SUSPENDED,
     },
     AppointmentStatusCode.SUSPENDED: {
         AppointmentStatusCode.CONFIRMED,
-        AppointmentStatusCode.ATTENDED,
-        AppointmentStatusCode.RESCHEDULED,
+        AppointmentStatusCode.WAITING,
         AppointmentStatusCode.CANCELLED,
     },
     AppointmentStatusCode.CANCELLED: set(),
@@ -59,6 +69,16 @@ class AppointmentStatusOut(BaseModel):
 
     id: int
     code: str
+    description: str | None = None
+
+
+class AppointmentStatusCreate(BaseModel):
+    code: str
+    description: str | None = None
+
+
+class AppointmentStatusUpdateSchema(BaseModel):
+    code: str | None = None
     description: str | None = None
 
 
@@ -91,6 +111,7 @@ class AppointmentUpdate(BaseModel):
 class AppointmentStatusUpdate(BaseModel):
     """Reschedule or transition status. `status` is required if using this path."""
     status: AppointmentStatusCode
+    reason: str | None = None
 
 
 class AppointmentOut(BaseModel):

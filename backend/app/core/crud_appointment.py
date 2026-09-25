@@ -327,9 +327,9 @@ async def attend_appointment(
     notes: str | None = None,
     duration_minutes: int | None = None,
 ) -> AppointmentModel:
-    """Mark appointment as ATTENDED. Only doctors can do this."""
-    if db_appointment.status.code not in ("CONFIRMADA", "REAGENDADA", "PENDIENTE"):
-        raise ValueError("Only CONFIRMED, RESCHEDULED, or PENDING appointments can be marked as attended.")
+    """Mark appointment as ATTENDED. Only doctors can do this. Must come from IN_PROGRESS."""
+    if db_appointment.status.code not in ("EN PROCESO",):
+        raise ValueError("Only appointments IN PROGRESS can be marked as attended.")
     
     # Check tolerance: appointment should have started (or be within 30 min after end)
     now = datetime.now(timezone.utc)
@@ -361,22 +361,62 @@ async def attend_appointment(
     return await get_appointment(db, db_appointment.id)
 
 
+async def wait_appointment(
+    db: AsyncSession,
+    db_appointment: AppointmentModel,
+    current_user: UserModel,
+) -> AppointmentModel:
+    """Mark appointment as WAITING (EN ESPERA). Patient has arrived at clinic."""
+    if db_appointment.status.code not in ("CONFIRMADA", "REAGENDADA"):
+        raise ValueError("Only CONFIRMED or RESCHEDULED appointments can be moved to waiting.")
+    
+    status = await get_status_by_code(db, AppointmentStatusCode.WAITING)
+    if status is None:
+        raise ValueError("WAITING status does not exist.")
+    db_appointment.status_id = status.id
+    
+    await db.commit()
+    await db.refresh(db_appointment)
+    return await get_appointment(db, db_appointment.id)
+
+
+async def start_appointment(
+    db: AsyncSession,
+    db_appointment: AppointmentModel,
+    current_user: UserModel,
+) -> AppointmentModel:
+    """Mark appointment as IN PROGRESS (EN PROCESO). Patient called to consultation."""
+    if db_appointment.status.code != "EN ESPERA":
+        raise ValueError("Only appointments in WAITING can be started.")
+    
+    status = await get_status_by_code(db, AppointmentStatusCode.IN_PROGRESS)
+    if status is None:
+        raise ValueError("IN_PROGRESS status does not exist.")
+    db_appointment.status_id = status.id
+    
+    await db.commit()
+    await db.refresh(db_appointment)
+    return await get_appointment(db, db_appointment.id)
+
+
 async def suspend_appointment(
     db: AsyncSession,
     db_appointment: AppointmentModel,
     current_user: UserModel,
-    reason: str | None = None,
+    reason: str,
 ) -> AppointmentModel:
-    """Suspend an appointment. Can be done by doctor or staff."""
+    """Suspend an appointment. Can be done by doctor or staff. Reason is required."""
     if db_appointment.status.code in ("ATENDIDA", "CANCELADA"):
         raise ValueError("Cannot suspend an attended or cancelled appointment.")
+    
+    if not reason or not reason.strip():
+        raise ValueError("El motivo de suspensión es obligatorio.")
     
     status = await get_status_by_code(db, AppointmentStatusCode.SUSPENDED)
     if status is None:
         raise ValueError("SUSPENDED status does not exist.")
     db_appointment.status_id = status.id
-    if reason:
-        db_appointment.reason = f"{db_appointment.reason}\n[Suspendida]: {reason}"
+    db_appointment.reason = f"{db_appointment.reason}\n[Suspendida]: {reason.strip()}"
     
     await db.commit()
     await db.refresh(db_appointment)
@@ -390,7 +430,7 @@ async def suspend_appointment(
                 patient.id,
                 "appointment_suspended",
                 "Cita suspendida",
-                f"Hola {patient.first_name}, tu cita con {doctor.first_name} {doctor.last_name} ha sido suspendida. Motivo: {reason or 'No especificado'}.",
+                f"Hola {patient.first_name}, tu cita con {doctor.first_name} {doctor.last_name} ha sido suspendida. Motivo: {reason.strip()}.",
             )
         )
     
@@ -401,11 +441,14 @@ async def cancel_appointment(
     db: AsyncSession,
     db_appointment: AppointmentModel,
     current_user: UserModel,
-    reason: str | None = None,
+    reason: str,
 ) -> AppointmentModel:
-    """Cancel an appointment. Can be done by patient or staff."""
+    """Cancel an appointment. Can be done by patient or staff. Reason is required."""
     if db_appointment.status.code in ("ATENDIDA", "CANCELADA"):
         raise ValueError("Cannot cancel an attended or already cancelled appointment.")
+    
+    if not reason or not reason.strip():
+        raise ValueError("El motivo de cancelación es obligatorio.")
     
     # Check if appointment is in the past
     if db_appointment.start_datetime < datetime.now(timezone.utc):
@@ -415,8 +458,7 @@ async def cancel_appointment(
     if status is None:
         raise ValueError("CANCELLED status does not exist.")
     db_appointment.status_id = status.id
-    if reason:
-        db_appointment.reason = f"{db_appointment.reason}\n[Cancelada]: {reason}"
+    db_appointment.reason = f"{db_appointment.reason}\n[Cancelada]: {reason.strip()}"
     
     await db.commit()
     await db.refresh(db_appointment)
@@ -430,7 +472,7 @@ async def cancel_appointment(
                 patient.id,
                 "appointment_cancelled",
                 "Cita cancelada",
-                f"Hola {patient.first_name}, tu cita con {doctor.first_name} {doctor.last_name} del {db_appointment.start_datetime.strftime('%d/%m/%Y %H:%M')} ha sido cancelada. Motivo: {reason or 'No especificado'}.",
+                f"Hola {patient.first_name}, tu cita con {doctor.first_name} {doctor.last_name} del {db_appointment.start_datetime.strftime('%d/%m/%Y %H:%M')} ha sido cancelada. Motivo: {reason.strip()}.",
             )
         )
     
@@ -519,6 +561,65 @@ async def get_statuses(db: AsyncSession) -> list:
         select(AppointmentStatusModel).order_by(AppointmentStatusModel.id)
     )
     return result.scalars().all()
+
+
+# --- CRUD for Appointment Statuses ---
+
+async def create_status(
+    db: AsyncSession, code: str, description: str | None = None
+) -> AppointmentStatusModel:
+    """Create a new appointment status."""
+    existing = await get_status_by_code(db, code)
+    if existing:
+        raise ValueError(f"Status with code '{code}' already exists.")
+    
+    status = AppointmentStatusModel(code=code, description=description)
+    db.add(status)
+    await db.commit()
+    await db.refresh(status)
+    return status
+
+
+async def update_status(
+    db: AsyncSession, status_id: int, code: str | None = None, description: str | None = None
+) -> AppointmentStatusModel:
+    """Update an existing appointment status."""
+    status = await get_status_by_id(db, status_id)
+    if not status:
+        raise ValueError(f"Status with id {status_id} not found.")
+    
+    if code is not None:
+        existing = await get_status_by_code(db, code)
+        if existing and existing.id != status_id:
+            raise ValueError(f"Status with code '{code}' already exists.")
+        status.code = code
+    
+    if description is not None:
+        status.description = description
+    
+    await db.commit()
+    await db.refresh(status)
+    return status
+
+
+async def delete_status(db: AsyncSession, status_id: int) -> bool:
+    """Delete an appointment status. Returns True if deleted, False if not found."""
+    status = await get_status_by_id(db, status_id)
+    if not status:
+        return False
+    
+    # Check if status is being used by any appointment
+    from sqlalchemy import select, func
+    count_result = await db.execute(
+        select(func.count(AppointmentModel.id)).where(AppointmentModel.status_id == status_id)
+    )
+    count = count_result.scalar() or 0
+    if count > 0:
+        raise ValueError(f"Cannot delete status '{status.code}' - it is used by {count} appointment(s).")
+    
+    await db.delete(status)
+    await db.commit()
+    return True
 
 
 # --- Batch job: Auto-cancel no-show appointments ---

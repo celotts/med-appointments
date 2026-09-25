@@ -11,6 +11,7 @@ import AppointmentActions from '../components/common/AppointmentActions';
 import { Plus, Search, Loader2, Sparkles, Check } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { medasistApi, RescheduleSuggestion, AvailabilitySlot } from '../api/medasistApi';
 
 const statusColors: Record<string, string> = {
@@ -35,6 +36,7 @@ const toLocalInput = (iso?: string) => {
 
 const AppointmentsPage: React.FC = () => {
   const { user } = useAuth();
+  const { registerUnsavedChanges, unregisterUnsavedChanges } = useUnsavedChanges();
   const isAdminOrSuperAdmin = user?.role === 'admin' || user?.role === 'super-admin';
   const isSpecialist = user?.role === 'specialist' || user?.role === 'doctor';
   const isAssistant = user?.role === 'assistant';
@@ -48,6 +50,12 @@ const AppointmentsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [assignedSpecialists, setAssignedSpecialists] = useState<Doctor[]>([]);
+
+  // Register unsaved changes tracking for this component
+  useEffect(() => {
+    registerUnsavedChanges('appointments-page', false);
+    return () => unregisterUnsavedChanges('appointments-page');
+  }, [registerUnsavedChanges, unregisterUnsavedChanges]);
   const [selectedSpecialist, setSelectedSpecialist] = useState<number | null>(null);
 
   // Server-side pagination state
@@ -57,7 +65,12 @@ const AppointmentsPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
 
-  const { register, handleSubmit, reset, getValues, setValue, watch, formState: { errors, isSubmitting } } = useForm<AppointmentCreate>();
+  const { register, handleSubmit, reset, getValues, setValue, watch, formState: { errors, isSubmitting, isDirty } } = useForm<AppointmentCreate>();
+
+  // Track form dirty state
+  useEffect(() => {
+    registerUnsavedChanges('appointments-page', isDirty);
+  }, [isDirty, registerUnsavedChanges]);
 
   // IA: sugerencias de reagendamiento
   const [aiAppt, setAiAppt] = useState<Appointment | null>(null);
@@ -202,10 +215,12 @@ const AppointmentsPage: React.FC = () => {
     setAiAppt(null);
     setAiSuggestions(null);
     setAiError(null);
+    registerUnsavedChanges('appointments-page', false);
   };
 
   const askAiSuggestions = async () => {
     if (!aiAppt || !aiDate) return;
+    registerUnsavedChanges('appointments-page', true);
     setAiLoading(true);
     setAiError(null);
     setAiSuggestions(null);
@@ -253,6 +268,7 @@ const AppointmentsPage: React.FC = () => {
       toast.error('Selecciona la fecha de inicio primero');
       return;
     }
+    registerUnsavedChanges('appointments-page', true);
     setSlotLoading(true);
     setSlotError(null);
     setAvailableSlots(null);
@@ -364,6 +380,27 @@ const AppointmentsPage: React.FC = () => {
     );
   };
 
+const validateAppointmentTimes = (startStr: string, endStr: string): string | true => {
+    if (!startStr || !endStr) return true;
+    const start = new Date(startStr);
+    const end = new Date(endStr);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return true;
+
+    // Validar que sea el mismo día
+    const startDate = start.toISOString().split('T')[0];
+    const endDate = end.toISOString().split('T')[0];
+    if (startDate !== endDate) {
+      return 'La cita debe comenzar y terminar el mismo día';
+    }
+
+    // Validar que la hora de inicio sea menor a la de fin
+    if (start.getTime() >= end.getTime()) {
+      return 'La hora de inicio debe ser anterior a la hora de fin';
+    }
+
+    return true;
+  };
+
   const openCreate = () => {
     setEditingAppointment(null);
     reset({
@@ -374,6 +411,7 @@ const AppointmentsPage: React.FC = () => {
       reason: '',
     });
     setIsModalOpen(true);
+    registerUnsavedChanges('appointments-page', true);
   };
 
   const openEdit = (appt: Appointment) => {
@@ -386,9 +424,16 @@ const AppointmentsPage: React.FC = () => {
       reason: appt.reason,
     });
     setIsModalOpen(true);
+    registerUnsavedChanges('appointments-page', true);
   };
 
   const onSubmit = async (data: AppointmentCreate) => {
+    const timeValidation = validateAppointmentTimes(data.start_datetime, data.end_datetime);
+    if (timeValidation !== true) {
+      toast.error(timeValidation);
+      return;
+    }
+
     const start = new Date(data.start_datetime).getTime();
     const end = new Date(data.end_datetime).getTime();
     if (isNaN(start) || isNaN(end) || end <= start) {
@@ -415,6 +460,7 @@ const AppointmentsPage: React.FC = () => {
         toast.success('Cita programada correctamente');
       }
       setIsModalOpen(false);
+      registerUnsavedChanges('appointments-page', false);
       loadAppointments();
     } catch (error: any) {
       toast.error(error.response?.data?.detail?.message || error.response?.data?.detail || 'Error al guardar la cita');
@@ -503,24 +549,20 @@ const AppointmentsPage: React.FC = () => {
             columns={columns}
             pageSize={pageSize}
             onPageSizeChange={setPageSize}
-            // Pass pagination info for server-side pagination display
+            // Server-side pagination
+            totalItems={totalItems}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
             defaultSortKey="start_datetime"
             defaultSortDirection="desc"
           />
         )}
 
-        {/* Pagination info */}
-        <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
-          <span>
-            Mostrando {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, totalItems)} de {totalItems} citas
-          </span>
-          <span>Página {currentPage} de {totalPages || 1}</span>
-        </div>
       </div>
 
       <Modal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => { setIsModalOpen(false); registerUnsavedChanges('appointments-page', false); }}
         title={editingAppointment ? 'Reprogramar Cita' : 'Nueva Cita'}
       >
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -566,12 +608,15 @@ const AppointmentsPage: React.FC = () => {
                 type="datetime-local"
                 {...register('start_datetime', {
                   required: 'Fecha de inicio requerida',
-                  validate: (value) =>
-                    hasDoctorConflict(value, getValues('end_datetime'), getValues('doctor_id'))
+                  validate: (value) => {
+                    const timeError = validateAppointmentTimes(value, getValues('end_datetime'));
+                    if (timeError !== true) return timeError;
+                    return hasDoctorConflict(value, getValues('end_datetime'), getValues('doctor_id'))
                       ? 'El médico ya tiene una cita en ese horario'
-                      : true
+                      : true;
+                  }
                 })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
+                className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent outline-none text-sm transition-all hover:border-slate-300 bg-white"
               />
               {errors.start_datetime && <p className="text-red-500 text-xs mt-1">{errors.start_datetime.message}</p>}
             </div>
@@ -581,12 +626,15 @@ const AppointmentsPage: React.FC = () => {
                 type="datetime-local"
                 {...register('end_datetime', {
                   required: 'Fecha de fin requerida',
-                  validate: (value) =>
-                    hasDoctorConflict(getValues('start_datetime'), value, getValues('doctor_id'))
+                  validate: (value) => {
+                    const timeError = validateAppointmentTimes(getValues('start_datetime'), value);
+                    if (timeError !== true) return timeError;
+                    return hasDoctorConflict(getValues('start_datetime'), value, getValues('doctor_id'))
                       ? 'El médico ya tiene una cita en ese horario'
-                      : true
+                      : true;
+                  }
                 })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-secondary outline-none text-sm transition-all"
+                className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent outline-none text-sm transition-all hover:border-slate-300 bg-white"
               />
               {errors.end_datetime && <p className="text-red-500 text-xs mt-1">{errors.end_datetime.message}</p>}
             </div>
