@@ -3,7 +3,7 @@
 <!-- GENERADO AUTOMATICAMENTE por scripts/gen_api_docs.py. NO EDITAR A MANO. -->
 <!-- Para cambiarlo: edita el codigo y ejecuta `python scripts/gen_api_docs.py` -->
 
-**108 operaciones** en **75 rutas**. Base: `/api/v1`.
+**119 operaciones** en **86 rutas**. Base: `/api/v1`.
 
 Verificado contra el codigo. Si algo no esta aqui, no existe.
 
@@ -35,12 +35,14 @@ paginada de verdad: `{page, page_size, total, total_pages, items}`.
 |:--|--:|
 | Appointments | 20 |
 | Integrations | 9 |
+| Dashboard | 7 |
 | Premium Features | 7 |
 | Assistants | 6 |
 | RAG & AI Agent | 6 |
 | Consulting Rooms | 5 |
 | Doctor Schedules | 5 |
 | Doctors | 5 |
+| Login | 5 |
 | Medical Histories | 5 |
 | Patients | 5 |
 | Specialties | 5 |
@@ -51,7 +53,6 @@ paginada de verdad: `{page, page_size, total, total_pages, items}`.
 | Reports & Dashboard | 4 |
 | Notifications | 3 |
 | Users | 3 |
-| Login | 1 |
 
 ## Endpoints sin proteccion
 
@@ -134,6 +135,18 @@ Todos los demas requieren `Authorization: Bearer <token>`.
 | `GET` | `/api/v1/consulting-rooms/{room_id}` | JWT |
 | `PUT` | `/api/v1/consulting-rooms/{room_id}` | JWT |
 
+### Dashboard
+
+| Método | Ruta | Rol |
+|:--|:--|:--|
+| `GET` | `/api/v1/dashboard/calendario` | JWT |
+| `GET` | `/api/v1/dashboard/kpis` | JWT |
+| `GET` | `/api/v1/dashboard/schedule` | JWT |
+| `GET` | `/api/v1/dashboard/scope` | JWT |
+| `GET` | `/api/v1/dashboard/series` | JWT |
+| `GET` | `/api/v1/dashboard/today` | JWT |
+| `GET` | `/api/v1/dashboard/workload` | JWT |
+
 ### Doctor Schedules
 
 | Método | Ruta | Rol |
@@ -177,6 +190,10 @@ Todos los demas requieren `Authorization: Bearer <token>`.
 | Método | Ruta | Rol |
 |:--|:--|:--|
 | `POST` | `/api/v1/login/access-token` | JWT |
+| `POST` | `/api/v1/login/logout` | JWT |
+| `POST` | `/api/v1/login/logout-all` | JWT |
+| `POST` | `/api/v1/login/refresh` | JWT |
+| `GET` | `/api/v1/login/sesiones` | JWT |
 
 > Medasist IA: Agenda determinista, sin LLM.
 

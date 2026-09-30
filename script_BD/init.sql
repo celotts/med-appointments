@@ -226,12 +226,22 @@ UPDATE users SET created_by_user_id = 'ffffffff-ffff-ffff-ffff-ffffffffffff' WHE
 UPDATE roles SET created_by_user_id = 'ffffffff-ffff-ffff-ffff-ffffffffffff' WHERE id = '00000000-0000-0000-0000-000000000001';
 
 
+-- NOTA sobre los roles: aqui solo se siembran `SYSTEM_ROLE` y `SUPER_ADMIN`.
+-- Los otros 4 canonicos (ADMIN, ASSISTANT, DOCTOR, SPECIALIST, PATIENT) los
+-- crea la migracion Alembic `d4e1b2f7a915_normaliza_roles`, que es la fuente
+-- de verdad de los nombres y de los UUID (ver `core/rbac.py`, `ROLE_IDS`).
+--
+-- Sembrarlos aqui con UUID propios fue el origen de una colision: este archivo
+-- asignaba ASSISTANT al slot ...0003, que `rbac.ROLE_IDS` reserva para ADMIN.
+-- Que los roles vivan en un solo sitio es la regla.
+--
+-- `SYSTEM_ROLE` (arriba, UUID ...0001) NO es un rol canonico. Se conserva
+-- porque `users.role_id` y los triggers de auditoria lo referencian, pero
+-- ninguna comparacion de rol debe contemplarlo: pertenece al vocabulario
+-- viejo. Ver `docs/SEGURIDAD.md`.
+
 INSERT INTO roles (id, name, created_by_user_id)
 VALUES ('00000000-0000-0000-0000-000000000002', 'SUPER_ADMIN', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
-
-
-INSERT INTO roles (id, name, created_by_user_id)
-VALUES ('00000000-0000-0000-0000-000000000003', 'ASSISTANT', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
 
 
 CREATE TABLE assistant_specialists (
