@@ -110,13 +110,22 @@ const DataTable = <T extends { id: any }>({
   return (
     <>
       <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm" style={{ height: '500px', display: 'flex', flexDirection: 'column' }}>
-        <div className="overflow-hidden">
+        {/* `overflow-x-auto`: con `table-layout: fixed` y sin anchos, el
+            navegador reparte el ancho a partes iguales y el contenido que no
+            cabe (emails largos) se derrama sobre la columna vecina, haciendo
+            que dos campos parezcan uno. Medido: las 5 columnas salian de 198px
+            y el email necesitaba 243px.
+
+            Ahora la celda recorta con puntos suspensivos y la tabla se desplaza
+            en horizontal cuando hace falta, que es mejor que solapar datos:
+            un email truncado se reconoce; dos campos pegados, no. */}
+        <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse" style={{ tableLayout: 'fixed', width: '100%' }}>
             <thead className="bg-white text-medical-textMuted text-xs uppercase tracking-wider sticky top-0 z-[100] shadow-lg" style={{ backgroundColor: '#ffffff', position: 'sticky', top: 0 }}>
               <tr className="bg-white" style={{ backgroundColor: '#ffffff' }}>
                 {columns.map((col, idx) => (
                   <th key={idx} className="px-4 py-3 font-semibold border-b-2 border-slate-200 sticky top-0 bg-white z-[90] cursor-pointer hover:bg-slate-50 select-none" onClick={() => col.sortable !== false && handleSort(col.accessor as string)} style={{ userSelect: 'none', backgroundColor: '#ffffff', width: col.width || 'auto' }}>
-                    <div className="flex items-center gap-1"><span>{col.header}</span>{col.sortable !== false && typeof col.accessor !== 'function' && <span className="ml-1 inline-flex">{getSortIcon(col.accessor)}</span>}</div>
+                    <div className="flex items-center gap-1"><span className="truncate">{col.header}</span>{col.sortable !== false && typeof col.accessor !== 'function' && <span className="ml-1 inline-flex shrink-0">{getSortIcon(col.accessor)}</span>}</div>
                   </th>
                 ))}
                 {(onEdit || onDelete) && <th className="px-4 py-3 font-semibold border-b-2 border-slate-200 text-right w-24 sticky right-0 bg-white z-[90]" style={{ backgroundColor: '#ffffff' }}>Acciones</th>}
@@ -137,7 +146,11 @@ const DataTable = <T extends { id: any }>({
                   {displayData.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/50 transition-colors bg-white">
                       {columns.map((col, colIdx) => (
-                        <td key={colIdx} className="px-4 py-3 text-sm text-medical-textMain" style={{ width: col.width || 'auto' }}>
+                        // `truncate` + `title`: el texto que no cabe se corta
+                        // con puntos suspensivos y el valor completo sigue
+                        // disponible al pasar el raton. Sin esto el texto largo
+                        // se derrama sobre la columna siguiente.
+                        <td key={colIdx} className="px-4 py-3 text-sm text-medical-textMain truncate" style={{ width: col.width || 'auto', maxWidth: col.width || undefined }} title={typeof col.accessor === 'function' ? undefined : String((item as any)[col.accessor as string] ?? '')}>
                           {typeof col.accessor === 'function' ? col.accessor(item) : escapeHtml((item as any)[col.accessor as string] as string)}
                         </td>
                       ))}

@@ -93,11 +93,14 @@ const PatientsPage: React.FC = () => {
   );
 
   const columns = [
-    { header: 'Nombre Completo', accessor: (p: Patient) => `${p.first_name} ${p.last_name}` },
-    { header: 'Documento', accessor: 'document_number' as const },
-    { header: 'Email', accessor: 'email' as const },
-    { header: 'Teléfono', accessor: 'phone' as const },
-    { header: 'Fecha Nac.', accessor: 'birth_date' as const },
+    // Anchos explicitos: con `table-layout: fixed` y sin ellos el navegador
+    // reparte el espacio a partes iguales, y el reparto sale mal (el email
+    // necesita mas que la fecha de nacimiento).
+    { header: 'Nombre Completo', accessor: (p: Patient) => `${p.first_name} ${p.last_name}`, width: '22%' },
+    { header: 'Documento', accessor: 'document_number' as const, width: '15%' },
+    { header: 'Email', accessor: 'email' as const, width: '26%' },
+    { header: 'Teléfono', accessor: 'phone' as const, width: '15%' },
+    { header: 'Fecha Nac.', accessor: 'birth_date' as const, width: '14%' },
   ];
 
   return (
