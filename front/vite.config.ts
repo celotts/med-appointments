@@ -12,4 +12,8 @@ export default defineConfig({
       },
     },
   },
+  // La cache de dependencias fuera de node_modules: dentro, Vite necesita
+  // escribir en `.vite/deps_temp_*` y en entornos con node_modules de solo
+  // lectura (contenedores, montajes de red) el arranque falla con EACCES.
+  cacheDir: process.env.VITE_CACHE_DIR || 'node_modules/.vite',
 })

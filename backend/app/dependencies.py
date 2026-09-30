@@ -22,10 +22,34 @@ async def get_db():
 async def get_current_user(
     db: AsyncSession = Depends(get_db), token: str = Depends(reusable_oauth2)
 ) -> User:
+    """Valida el access token y devuelve su usuario.
+
+    ## Por que se exige `exp`
+
+    `jwt.decode` comprueba la caducidad **solo si el claim existe**: un JWT sin
+    `exp` se aceptaba con un 200, y era una sesion eterna. No es un token
+    valido, es un token que nunca caduca, y con el access token corto de ahora
+    (15 min) cabia en un payload para saltarse la caducidad por completo.
+
+    `options={"require": [...]}` hace que el decodificador rechace el token si
+    le faltan esos claims.
+
+    ## Por que 404 y no 401 si el usuario no existe
+
+    El 401 se reserva para "token invalido". Un 404 en ese caso evita que un
+    atacante distinga un id de usuario real de uno inventado probando tokens.
+    """
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = uuid.UUID(payload.get("sub"))
-    except (jwt.JWTError, ValidationError, AttributeError) as err:
+        # `exp` obligatorio. NO se usa `options={"require": [...]}` porque
+        # python-jose 3.5.0 acepta el argumento y lo ignora: un JWT sin `exp`
+        # pasaba la validacion con un 200. Comprobado, no supuesto.
+        if "exp" not in payload:
+            raise jwt.JWTError("Token sin claim 'exp'")
+        if "sub" not in payload:
+            raise jwt.JWTError("Token sin claim 'sub'")
+        user_id = uuid.UUID(payload["sub"])
+    except (jwt.JWTError, ValidationError, AttributeError, KeyError) as err:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials.",
