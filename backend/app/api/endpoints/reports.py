@@ -46,31 +46,31 @@ async def get_dashboard_summary(
                 (SELECT COUNT(*) FROM doctors) AS total_doctors,
                 (SELECT COUNT(*) FROM appointments
                  WHERE DATE(start_datetime) = CURRENT_DATE
-                   AND status_id != (SELECT id FROM appointment_statuses WHERE code = 'CANCELADA')
+                   AND status_id != (SELECT id FROM appointment_statuses WHERE code = 'CANCELLED')
                 ) AS total_appointments_today,
                 (SELECT COUNT(*) FROM appointments
                  WHERE start_datetime >= DATE_TRUNC('week', NOW())
                    AND start_datetime < DATE_TRUNC('week', NOW()) + INTERVAL '7 days'
-                   AND status_id != (SELECT id FROM appointment_statuses WHERE code = 'CANCELADA')
+                   AND status_id != (SELECT id FROM appointment_statuses WHERE code = 'CANCELLED')
                 ) AS total_appointments_week,
                 (SELECT COUNT(*) FROM appointments
                  WHERE start_datetime >= DATE_TRUNC('month', NOW())
                    AND start_datetime < DATE_TRUNC('month', NOW()) + INTERVAL '1 month'
-                   AND status_id != (SELECT id FROM appointment_statuses WHERE code = 'CANCELADA')
+                   AND status_id != (SELECT id FROM appointment_statuses WHERE code = 'CANCELLED')
                 ) AS total_appointments_month,
                 (SELECT COUNT(*) FROM appointments
-                 WHERE status_id = (SELECT id FROM appointment_statuses WHERE code = 'PENDIENTE')
+                 WHERE status_id = (SELECT id FROM appointment_statuses WHERE code = 'SCHEDULED')
                 ) AS appointments_pending,
                 (SELECT COUNT(*) FROM appointments
-                 WHERE status_id = (SELECT id FROM appointment_statuses WHERE code = 'CONFIRMADA')
+                 WHERE status_id = (SELECT id FROM appointment_statuses WHERE code = 'CONFIRMED')
                 ) AS appointments_confirmed,
                 (SELECT COUNT(*) FROM appointments
                  WHERE DATE(start_datetime) = CURRENT_DATE
-                   AND status_id = (SELECT id FROM appointment_statuses WHERE code = 'COMPLETADA')
+                   AND status_id = (SELECT id FROM appointment_statuses WHERE code = 'COMPLETED')
                 ) AS appointments_completed_today,
                 (SELECT COUNT(*) FROM appointments
                  WHERE start_datetime >= DATE_TRUNC('month', NOW())
-                   AND status_id = (SELECT id FROM appointment_statuses WHERE code = 'CANCELADA')
+                   AND status_id = (SELECT id FROM appointment_statuses WHERE code = 'CANCELLED')
                 ) AS appointments_cancelled_month
             """
         )
@@ -91,15 +91,14 @@ async def get_appointments_by_day(
     language: str = Depends(get_language),
 ) -> Any:
     """Returns appointment count grouped by day for the last N days."""
-    # Build query with days parameter (validated 1-365 by FastAPI)
     interval_days = f"INTERVAL '{days} days'"
     result = await db.execute(
         text(
             f"""
             SELECT DATE(start_datetime) AS day,
                    COUNT(*) AS total,
-                   SUM(CASE WHEN ec.code = 'COMPLETADA' THEN 1 ELSE 0 END) AS completed,
-                   SUM(CASE WHEN ec.code = 'CANCELADA' THEN 1 ELSE 0 END) AS cancelled
+                   SUM(CASE WHEN ec.code = 'COMPLETED' THEN 1 ELSE 0 END) AS completed,
+                   SUM(CASE WHEN ec.code = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelled
             FROM appointments c
             JOIN appointment_statuses ec ON ec.id = c.status_id
             WHERE c.start_datetime >= NOW() - {interval_days}
@@ -125,7 +124,6 @@ async def get_appointments_by_doctor(
     language: str = Depends(get_language),
 ) -> Any:
     """Returns appointment count grouped by doctor."""
-    # Build query with days parameter (validated 1-365 by FastAPI)
     interval_days = f"INTERVAL '{days} days'"
     result = await db.execute(
         text(
@@ -133,8 +131,8 @@ async def get_appointments_by_doctor(
             SELECT CONCAT(m.first_name, ' ', m.last_name) AS doctor,
                    e.name AS specialty,
                    COUNT(*) AS total_appointments,
-                   SUM(CASE WHEN ec.code = 'COMPLETADA' THEN 1 ELSE 0 END) AS completed,
-                   SUM(CASE WHEN ec.code = 'CANCELADA' THEN 1 ELSE 0 END) AS cancelled
+                   SUM(CASE WHEN ec.code = 'COMPLETED' THEN 1 ELSE 0 END) AS completed,
+                   SUM(CASE WHEN ec.code = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelled
             FROM appointments c
             JOIN doctors m ON m.id = c.doctor_id
             JOIN specialties e ON e.id = m.specialty_id
@@ -162,15 +160,14 @@ async def get_no_show_rate(
     language: str = Depends(get_language),
 ) -> Any:
     """Returns no-show rate statistics."""
-    # Build query with days parameter (validated 1-365 by FastAPI)
     interval_days = f"INTERVAL '{days} days'"
     result = await db.execute(
         text(
             f"""
             SELECT COUNT(*) AS total,
-                   SUM(CASE WHEN ec.code = 'COMPLETADA' THEN 1 ELSE 0 END) AS completed,
-                   SUM(CASE WHEN ec.code = 'CANCELADA' THEN 1 ELSE 0 END) AS cancelled,
-                   SUM(CASE WHEN ec.code = 'PENDIENTE' THEN 1 ELSE 0 END) AS pending
+                   SUM(CASE WHEN ec.code = 'COMPLETED' THEN 1 ELSE 0 END) AS completed,
+                   SUM(CASE WHEN ec.code = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelled,
+                   SUM(CASE WHEN ec.code = 'SCHEDULED' THEN 1 ELSE 0 END) AS pending
             FROM appointments c
             JOIN appointment_statuses ec ON ec.id = c.status_id
             WHERE c.start_datetime >= NOW() - {interval_days}

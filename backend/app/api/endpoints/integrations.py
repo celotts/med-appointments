@@ -2,14 +2,14 @@
 
 from typing import Any
 
-from dependencies import get_current_user, get_db
+from core import rbac
+from dependencies import get_current_user, get_db, require_admin
 from dependencies_i18n import I18nResponse, get_language
 from fastapi import APIRouter, Depends, HTTPException, Query
+from models.user import User as UserModel
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from models.user import User as UserModel
 
 router = APIRouter(prefix="/api/v1", tags=["Integrations"])
 
@@ -238,7 +238,7 @@ async def create_branch(
     payload: BranchCreate,
     *,
     db: AsyncSession = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(require_admin),
     language: str = Depends(get_language),
 ) -> Any:
     result = await db.execute(
@@ -265,7 +265,7 @@ async def update_branch(
     payload: BranchUpdate,
     *,
     db: AsyncSession = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(require_admin),
     language: str = Depends(get_language),
 ) -> Any:
     values = payload.model_dump(exclude_unset=True)
@@ -306,7 +306,7 @@ async def delete_branch(
     branch_id: int,
     *,
     db: AsyncSession = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(require_admin),
     language: str = Depends(get_language),
 ):
     result = await db.execute(
@@ -334,7 +334,7 @@ async def delete_branch(
 async def list_roles(
     *,
     db: AsyncSession = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(require_admin),
     language: str = Depends(get_language),
 ) -> Any:
     """Lists all system roles."""
@@ -375,7 +375,19 @@ async def get_user_permissions(
     current_user: UserModel = Depends(get_current_user),
     language: str = Depends(get_language),
 ) -> Any:
-    """Returns permissions for a specific user based on their role."""
+    """Permisos de un usuario.
+
+    Solo el propio usuario o un administrador pueden consultarlos: este
+    endpoint devuelve email, nombre y rol, que no son datos publicos.
+    """
+    if str(current_user.id) != str(user_id) and not rbac.has_role(
+        current_user, rbac.ADMIN_ROLES
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Solo puede consultar sus propios permisos.",
+        )
+
     i18n = I18nResponse(language)
     result = await db.execute(
         text(

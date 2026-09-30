@@ -12,6 +12,7 @@ from api.endpoints import (  # noqa: E402
     appointment_statuses,
     appointments,
     assistants,
+    audit,
     consulting_rooms,
     doctor_schedules,
     doctors,
@@ -121,6 +122,9 @@ for route in visual_indicators.router.routes:
 
 # Medasist IA
 app.include_router(medasist.router)
+
+# Auditoría (solo admin; ver api/endpoints/audit.py)
+app.include_router(audit.router)
 
 # Other endpoints
 app.include_router(notifications.router)

@@ -1021,7 +1021,7 @@ async def reagendamiento_inteligente(appointment_id: int) -> str:
             await engine.dispose()
             return f"Appointment {appointment_id} not found."
 
-        if cita["status"] in ("CANCELADA", "COMPLETADA"):
+        if cita["status"] in ("CANCELADA", "ATENDIDA"):
             await engine.dispose()
             return f"Cannot reschedule a {cita['status']} appointment."
 
@@ -1283,7 +1283,7 @@ async def predecir_no_show(patient_id: int) -> str:
 
     total = len(historial)
     canceladas = sum(1 for h in historial if h["status"] == "CANCELADA")
-    completadas = sum(1 for h in historial if h["status"] == "COMPLETADA")
+    completadas = sum(1 for h in historial if h["status"] == "ATENDIDA")
 
     # Calculate base probability
     tasa_cancelacion = canceladas / total if total > 0 else 0
@@ -1680,7 +1680,7 @@ async def cancelar_citas_masivo(
                 JOIN appointment_statuses ec ON ec.id = c.status_id
                 WHERE c.doctor_id = :doctor_id
                   AND DATE(c.start_datetime) = :fecha
-                  AND ec.code NOT IN ('CANCELADA', 'COMPLETADA')
+                  AND ec.code NOT IN ('CANCELADA', 'ATENDIDA')
                 ORDER BY c.start_datetime
                 """
             ),
@@ -1783,7 +1783,7 @@ async def replanificar_citas(
                 JOIN appointment_statuses ec ON ec.id = c.status_id
                 WHERE c.doctor_id = :doctor_id
                   AND DATE(c.start_datetime) = :fecha_origen
-                  AND ec.code NOT IN ('CANCELADA', 'COMPLETADA')
+                  AND ec.code NOT IN ('CANCELADA', 'ATENDIDA')
                 ORDER BY c.start_datetime
                 """
             ),
@@ -2059,7 +2059,7 @@ async def protocolo_emergencia(
                 JOIN appointment_statuses ec ON ec.id = c.status_id
                 WHERE c.doctor_id = :doctor_id
                   AND DATE(c.start_datetime) = :fecha
-                  AND ec.code NOT IN ('CANCELADA', 'COMPLETADA')
+                  AND ec.code NOT IN ('CANCELADA', 'ATENDIDA')
                 ORDER BY c.start_datetime
                 """
             ),
@@ -2417,7 +2417,7 @@ async def matching_paciente_medico(patient_id: int) -> str:
                 """
                 SELECT p.id, CONCAT(p.first_name, ' ', p.last_name) AS name,
                        COUNT(c.id) AS total_appointments,
-                       SUM(CASE WHEN ec.code = 'COMPLETADA' THEN 1 ELSE 0 END) AS completadas,
+                       SUM(CASE WHEN ec.code = 'ATENDIDA' THEN 1 ELSE 0 END) AS completadas,
                        SUM(CASE WHEN ec.code = 'CANCELADA' THEN 1 ELSE 0 END) AS canceladas
                 FROM patients p
                 LEFT JOIN appointments c ON c.patient_id = p.id
@@ -2441,7 +2441,7 @@ async def matching_paciente_medico(patient_id: int) -> str:
                 SELECT m.id, CONCAT(m.first_name, ' ', m.last_name) AS name,
                        e.name AS specialty,
                        COUNT(c.id) AS appointments_con_paciente,
-                       SUM(CASE WHEN ec.code = 'COMPLETADA' THEN 1 ELSE 0 END) AS completadas,
+                       SUM(CASE WHEN ec.code = 'ATENDIDA' THEN 1 ELSE 0 END) AS completadas,
                        SUM(CASE WHEN ec.code = 'CANCELADA' THEN 1 ELSE 0 END) AS canceladas
                 FROM doctors m
                 JOIN specialties e ON e.id = m.specialty_id
@@ -2464,7 +2464,7 @@ async def matching_paciente_medico(patient_id: int) -> str:
                 SELECT m.id, CONCAT(m.first_name, ' ', m.last_name) AS name,
                        e.name AS specialty,
                        COUNT(c.id) AS total_appointments,
-                       SUM(CASE WHEN ec.code = 'COMPLETADA' THEN 1 ELSE 0 END) AS completadas
+                       SUM(CASE WHEN ec.code = 'ATENDIDA' THEN 1 ELSE 0 END) AS completadas
                 FROM doctors m
                 JOIN specialties e ON e.id = m.specialty_id
                 LEFT JOIN appointments c ON c.doctor_id = m.id
@@ -2557,7 +2557,7 @@ async def duracion_inteligente(doctor_id: int, motivo: str = "") -> str:
                 FROM appointments c
                 JOIN appointment_statuses ec ON ec.id = c.status_id
                 WHERE c.doctor_id = :doctor_id
-                  AND ec.code = 'COMPLETADA'
+                  AND ec.code = 'ATENDIDA'
                 """
             ),
             {"doctor_id": doctor_id},
@@ -2575,7 +2575,7 @@ async def duracion_inteligente(doctor_id: int, motivo: str = "") -> str:
                     JOIN appointment_statuses ec ON ec.id = c.status_id
                     WHERE c.doctor_id = :doctor_id
                       AND c.reason ILIKE :motivo
-                      AND ec.code = 'COMPLETADA'
+                      AND ec.code = 'ATENDIDA'
                     """
                 ),
                 {"doctor_id": doctor_id, "reason": f"%{motivo}%"},
@@ -2658,7 +2658,7 @@ async def optimizar_ingresos(doctor_id: int, days: int = 30) -> str:
 
     for row in stats:
         hora = int(row["hora"])
-        if row["status"] == "COMPLETADA":
+        if row["status"] == "ATENDIDA":
             horas_facturacion[hora] = horas_facturacion.get(hora, 0) + row["total"]
             total_completadas += row["total"]
         elif row["status"] == "CANCELADA":
@@ -2779,7 +2779,7 @@ async def score_satisfaccion(patient_id: int) -> str:
         )
 
     total = len(historial)
-    completadas = sum(1 for h in historial if h["status"] == "COMPLETADA")
+    completadas = sum(1 for h in historial if h["status"] == "ATENDIDA")
     canceladas = sum(1 for h in historial if h["status"] == "CANCELADA")
     reagendadas = sum(1 for h in historial if h["status"] == "REAGENDADA")
 
@@ -3085,7 +3085,7 @@ async def scheduling_adaptativo(doctor_id: int) -> str:
                 SELECT EXTRACT(HOUR FROM c.start_datetime) AS hora,
                        AVG(EXTRACT(EPOCH FROM (c.end_datetime - c.start_datetime))/60) AS duracion_real,
                        COUNT(*) AS total_appointments,
-                       SUM(CASE WHEN ec.code = 'COMPLETADA' THEN 1 ELSE 0 END) AS completadas
+                       SUM(CASE WHEN ec.code = 'ATENDIDA' THEN 1 ELSE 0 END) AS completadas
                 FROM appointments c
                 JOIN appointment_statuses ec ON ec.id = c.status_id
                 WHERE c.doctor_id = :doctor_id
@@ -3233,7 +3233,7 @@ async def resolver_conflicto_cirugia(
                   AND DATE(c.start_datetime) = :fecha
                   AND c.start_datetime < :hora_fin
                   AND c.end_datetime > :hora_inicio
-                  AND ec.code NOT IN ('CANCELADA', 'COMPLETADA')
+                  AND ec.code NOT IN ('CANCELADA', 'ATENDIDA')
                 ORDER BY c.start_datetime
                 """
             ),
