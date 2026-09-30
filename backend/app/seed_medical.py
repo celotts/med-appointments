@@ -40,13 +40,19 @@ async def seed_data():
         from sqlalchemy import select
         r = await db.execute(select(AppointmentStatusModel))
         existing_statuses = {s.code: s for s in r.scalars().all()}
+        # Los 8 estados canonicos (ver schemas/appointment.py). Antes este
+        # seed creaba codigos en ingles (SCHEDULED, COMPLETED, NO_SHOW...)
+        # que el enum AppointmentStatusCode nunca reconocia, dejando citas
+        # invalidas en la base.
         statuses_to_create = [
-            ("SCHEDULED", "Programada"),
-            ("CONFIRMED", "Confirmada"),
-            ("IN_PROGRESS", "En curso"),
-            ("COMPLETED", "Completada"),
-            ("CANCELLED", "Cancelada"),
-            ("NO_SHOW", "No se presentó"),
+            ("PENDIENTE", "Cita pendiente de confirmacion"),
+            ("CONFIRMADA", "Cita confirmada"),
+            ("EN ESPERA", "Cita en sala de espera"),
+            ("EN PROCESO", "Consulta en curso"),
+            ("ATENDIDA", "Cita atendida"),
+            ("CANCELADA", "Cita cancelada"),
+            ("SUSPENDIDA", "Cita suspendida"),
+            ("REAGENDADA", "Cita reagendada a nueva fecha"),
         ]
         for code, desc in statuses_to_create:
             if code not in existing_statuses:

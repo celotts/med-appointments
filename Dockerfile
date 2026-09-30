@@ -45,15 +45,21 @@ RUN pip install --no-cache-dir --no-index --find-links=/wheels /wheels/*
 # Copiar el código fuente asegurando que quede dentro de la carpeta app
 COPY backend/app /app/app
 
+# Copiar script de semilla y entrypoint
+COPY backend/app/seed_large_dataset.py /app/app/seed_large_dataset.py
+COPY backend/docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY backend/alembic.ini /app/alembic.ini
+COPY backend/alembic /app/alembic
+RUN chmod +x /app/docker-entrypoint.sh
+
 # Configuración de pytest y suite de pruebas para `make test`
 COPY backend/pytest.ini /app/pytest.ini
 COPY backend/tests /app/tests
 
-# Usuario de sistema (comentado por problemas de construcción en algunos entornos)
-# RUN addgroup -S appgroup && adduser -S -G appgroup appuser
-# USER appuser
+# Instalar cliente postgres para pg_isready
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 8000
 
-# Apuntar correctamente al módulo dentro del paquete app
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Usar entrypoint que espera DB, migra y semilla
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

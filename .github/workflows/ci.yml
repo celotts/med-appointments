@@ -6,10 +6,44 @@ on:
   pull_request:
 
 jobs:
-  test:
-    name: Tests integrales (BD real + Ollama)
+  # Etapa 1: verificación estática, sin Docker ni base de datos.
+  # Detecta documentación desfasada, vocabulario divergente de estados o
+  # roles, migraciones con múltiples heads y secretos versionados.
+  verify-docs:
+    name: Documentación vs código
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Instalar dependencias
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Verificar documentación
+        run: make verify-docs
+
+      - name: Comprobar que docs/API.md está regenerado
+        run: |
+          # Si el archivo generado cambia tras regenerarlo, alguien editó
+          # docs/API.md a mano o agregó una ruta sin documentar.
+          python scripts/gen_api_docs.py
+          git diff --exit-code docs/API.md
+
+  # Etapa 2: pruebas de integración contra PostgreSQL real y Ollama.
+  test:
+    name: Pruebas integrales (BD real + Ollama)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     services:
       postgres:
@@ -45,35 +79,66 @@ jobs:
         working-directory: backend
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pytest pytest-asyncio
+          pip install -r requirements.txt -r requirements-dev.txt
 
-      # Lanzar Ollama (servicio separado) con los modelos necesarios
-      - name: Iniciar Ollama
+      # Ollama corre como servicio separado con los modelos del proyecto.
+      - name: Instalar Ollama
         run: |
           curl -fsSL https://ollama.com/install.sh | sh
-          ollama serve &
-          sleep 5
+          sudo systemctl start ollama || (ollama serve &)
+          sleep 10
           ollama pull nomic-embed-text
           ollama pull llama3.2
 
-      # Esperar a que la BD esté lista
-      - name: Esperar base de datos
-        run: |
-          for i in $(seq 1 30); do
-            PGPASSWORD=fc100711 pg_isready -h localhost -p 5432 -U root -d appointment && break
-            sleep 2
-          done
-
-      # Crear esquema inicial
-      - name: Crear esquema de la BD
+      - name: Crear el esquema de la BD
         run: PGPASSWORD=fc100711 psql -h localhost -U root -d appointment -f script_BD/init.sql
 
-      # Aplicar migraciones (baseline + seeds)
       - name: Aplicar migraciones Alembic
         working-directory: backend
-        run: python -m alembic upgrade head
+        run: |
+          python -m alembic upgrade head
+          # Debe haber un solo head; si no, `upgrade head` fallaría.
+          test "$(python -m alembic heads | wc -l)" -eq 1
 
-      # Ejecutar la suite completa
-      - name: Ejecutar tests
+      # Los estados canónicos deben existir tras las migraciones. Este es el
+      # fallo que ocurría en producción: /wait, /start y /attend dependían
+      # de EN ESPERA, EN PROCESO y ATENDIDA.
+      - name: Verificar estados canónicos en la BD
+        run: |
+          PGPASSWORD=fc100711 psql -h localhost -U root -d appointment -tAc \
+            "SELECT count(*) FROM appointment_statuses WHERE code IN \
+             ('PENDIENTE','CONFIRMADA','EN ESPERA','EN PROCESO','ATENDIDA','CANCELADA','SUSPENDIDA','REAGENDADA')" \
+            | grep -qx 8
+
+      - name: Ejecutar pytest
         working-directory: backend
         run: python -m pytest -v
+
+  # Etapa 3: typecheck y build del frontend.
+  frontend:
+    name: Frontend (typecheck + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: front
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: front/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+
+      # noUnusedLocals y strict están activos: un import sin usar falla.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
