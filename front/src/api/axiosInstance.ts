@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios'
 import { toast } from 'react-hot-toast'
+import { clearTokens, getAccessToken } from './tokenStorage'
 
 // Axios instance con base URL /api/v1 (usado por todos los endpoints de la API)
 const axiosInstance: AxiosInstance = axios.create({
@@ -12,7 +13,7 @@ const axiosInstance: AxiosInstance = axios.create({
 // Request Interceptor: Agrega el token de acceso a CADA petición automáticamente
 axiosInstance.interceptors.request.use(
   (config: any) => {
-    const token = localStorage.getItem('access_token')
+    const token = getAccessToken()
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -27,8 +28,7 @@ axiosInstance.interceptors.response.use(
   (error: any) => {
     if (error.response?.status === 401) {
       // Token expirado - limpiar y redirect al login
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
+      clearTokens()
       toast.error('Sesión expirada. Por favor, inicia sesión nuevamente.')
       window.location.href = '/login'
     }

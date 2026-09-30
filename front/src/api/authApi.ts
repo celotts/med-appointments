@@ -1,4 +1,5 @@
 import api from './api'
+import { clearTokens, getAccessToken, getRefreshToken, isAuthenticated, setTokens } from './tokenStorage'
 
 export interface LoginCredentials {
   email: string
@@ -14,7 +15,12 @@ export interface User {
   id: string
   email: string
   full_name: string
-  role: string
+  /**
+   * Rol del usuario. `/api/v1/me` lo devuelve como objeto `{name}`, mientras
+   * `/api/v1/users/{id}/permissions` lo devuelve como string. Acepta ambos:
+   * normalizalo con `normalizeRole` de src/auth/roles.ts.
+   */
+  role: string | { name: string }
 }
 
 export interface LoginResponse {
@@ -34,36 +40,20 @@ export async function login(credentials: LoginCredentials): Promise<Tokens> {
     },
   })
 
-  // Guardar tokens en localStorage para persistencia
+  // Guardar tokens via tokenStorage (fuente unica de verdad)
   if (response.data.access_token) {
-    localStorage.setItem('access_token', response.data.access_token)
-  }
-  if (response.data.refresh_token) {
-    localStorage.setItem('refresh_token', response.data.refresh_token)
+    setTokens(response.data.access_token, response.data.refresh_token)
   }
 
   return response.data as Tokens
 }
 
+// Reexportados desde tokenStorage para mantener la API publica existente.
+export { getAccessToken, getRefreshToken, isAuthenticated }
+
 // Logout: Limpia todos los tokens de localStorage
 export function logout(): void {
-  localStorage.removeItem('access_token')
-  localStorage.removeItem('refresh_token')
-}
-
-// Obtener token actual de acceso
-export function getAccessToken(): string | null {
-  return localStorage.getItem('access_token')
-}
-
-// Obtener token de refresco actual
-export function getRefreshToken(): string | null {
-  return localStorage.getItem('refresh_token')
-}
-
-// Verificar si el usuario está autenticado
-export function isAuthenticated(): boolean {
-  return !!localStorage.getItem('access_token')
+  clearTokens()
 }
 
 // Obtener datos del usuario actual

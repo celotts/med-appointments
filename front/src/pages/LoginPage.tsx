@@ -5,6 +5,7 @@ import { authApi } from '../api/authApi';
 import { toast } from 'react-hot-toast';
 import { Lock, Mail, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useForm } from 'react-hook-form';
+import { normalizeRole, PATIENT } from '../auth/roles';
 
 interface LoginForm {
   email: string;
@@ -24,21 +25,24 @@ const LoginPage: React.FC = () => {
       let userData;
       try {
         const me = await authApi.getMe();
-        const roleName = me.role?.name || me.role || 'user';
-        // Normalizar roles para comparación en frontend
-        const normalizedRole = roleName.toLowerCase().replace('_', '-');
+        // `me.role` llega como string (nombre del rol) o como {name}. Se
+        // normaliza con el mismo criterio que backend/app/core/rbac.py para
+        // que los permisos se resuelvan igual en ambos lados.
+        const roleName =
+          typeof me.role === 'string' ? me.role : me.role?.name || PATIENT;
         userData = {
           id: me.id,
           email: me.email,
           full_name: me.full_name || me.email.split('@')[0],
-          role: normalizedRole,
+          role: normalizeRole(roleName),
         };
       } catch {
+        // Si /me falla se cae al rol mas restrictivo: nunca ADMIN.
         userData = {
           id: '',
           email: data.email,
           full_name: data.email.split('@')[0],
-          role: 'user',
+          role: PATIENT,
         };
       }
 

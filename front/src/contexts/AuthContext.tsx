@@ -1,9 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { clearTokens, getAccessToken } from '../api/tokenStorage';
 
 export interface User {
   id: string;
   email: string;
   full_name: string;
+  // Nombre del rol tal como lo guarda la BD: SUPER_ADMIN, ADMIN, DOCTOR,
+  // SPECIALIST, ASSISTANT o PATIENT. Usar `hasRole()` de core/rbac.py para
+  // decidir permisos, nunca comparar strings a mano.
   role: string;
 }
 
@@ -46,12 +50,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Al recargar se rehidrata desde `access_token` (clave que usa axiosInstance)
+  // y el perfil cacheado. Antes se leia `auth_token`, que solo escribia el
+  // login: tras un refresh de pagina el estado de sesion quedaba inconsistente.
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
+    const token = getAccessToken();
     const userData = localStorage.getItem('user_data');
     if (token && userData) {
       if (isTokenExpired(token)) {
-        localStorage.removeItem('auth_token');
+        clearTokens();
         localStorage.removeItem('user_data');
       } else {
         setUser(JSON.parse(userData));
@@ -64,7 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (!isAuthenticated) return;
     const interval = setInterval(() => {
-      const token = localStorage.getItem('auth_token');
+      const token = getAccessToken();
       if (!token || isTokenExpired(token)) {
         logout();
       }
@@ -73,23 +80,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [isAuthenticated]);
 
   const login = (token: string, userData: User) => {
-    localStorage.setItem('auth_token', token);
+    localStorage.setItem('access_token', token);
     localStorage.setItem('user_data', JSON.stringify(userData));
     setUser(userData);
     setIsAuthenticated(true);
   };
 
   const logout = useCallback(() => {
-    localStorage.removeItem('auth_token');
+    clearTokens();
     localStorage.removeItem('user_data');
-    localStorage.removeItem('refresh_token');
     setUser(null);
     setIsAuthenticated(false);
     window.location.href = '/login';
   }, []);
 
   const isTokenValid = useCallback(() => {
-    const token = localStorage.getItem('auth_token');
+    const token = getAccessToken();
     if (!token) return false;
     return !isTokenExpired(token);
   }, []);
