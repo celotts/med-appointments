@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
-import { LogOut, User, ChevronDown, AlertTriangle, X, Check } from 'lucide-react';
+import { LogOut, User, ChevronDown, AlertTriangle } from 'lucide-react';
 import NotificationBell from '../common/NotificationBell';
 
 const Header: React.FC = () => {

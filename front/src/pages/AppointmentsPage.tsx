@@ -10,6 +10,7 @@ import { FilterButtons } from '../components/common/FilterButtons';
 import AppointmentActions from '../components/common/AppointmentActions';
 import { Plus, Search, Loader2, Sparkles, Check } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { isAdmin, hasRole, DOCTOR, SPECIALIST, ASSISTANT } from '../auth/roles';
 import { useAuth } from '../contexts/AuthContext';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { medasistApi, RescheduleSuggestion, AvailabilitySlot } from '../api/medasistApi';
@@ -37,9 +38,12 @@ const toLocalInput = (iso?: string) => {
 const AppointmentsPage: React.FC = () => {
   const { user } = useAuth();
   const { registerUnsavedChanges, unregisterUnsavedChanges } = useUnsavedChanges();
-  const isAdminOrSuperAdmin = user?.role === 'admin' || user?.role === 'super-admin';
-  const isSpecialist = user?.role === 'specialist' || user?.role === 'doctor';
-  const isAssistant = user?.role === 'assistant';
+  // Roles normalizados via src/auth/roles.ts (replica de backend/app/core/rbac.py).
+// Antes se comparaba contra 'admin' / 'super-admin' / 'specialist' / 'doctor',
+// que nunca coinciden con los valores reales de la BD (SUPER_ADMIN, DOCTOR...).
+  const isAdminOrSuperAdmin = isAdmin(user?.role);
+  const isSpecialist = hasRole(user?.role, [DOCTOR, SPECIALIST]);
+  const isAssistant = hasRole(user?.role, [ASSISTANT]);
 
   const [patients, setPatients] = useState<Patient[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -62,7 +66,6 @@ const AppointmentsPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
   const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
 
   const { register, handleSubmit, reset, getValues, setValue, watch, formState: { errors, isSubmitting, isDirty } } = useForm<AppointmentCreate>();
@@ -147,8 +150,7 @@ const AppointmentsPage: React.FC = () => {
 
       setAppointments(response.items);
       setTotalItems(response.total);
-      setTotalPages(response.total_pages);
-      
+
       // Adjust current page if it exceeds total pages
       if (currentPage > response.total_pages && response.total_pages > 0) {
         setCurrentPage(response.total_pages);
@@ -467,16 +469,10 @@ const validateAppointmentTimes = (startStr: string, endStr: string): string | tr
     }
   };
 
-  const handleDelete = async (appt: Appointment) => {
-    if (!confirm(`¿Estás seguro de eliminar la cita #${appt.id}?`)) return;
-    try {
-      await appointmentApi.delete(appt.id);
-      toast.success('Cita eliminada correctamente');
-      loadAppointments();
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail?.message || error.response?.data?.detail || 'Error al eliminar la cita');
-    }
-  };
+  // Nota: el endpoint DELETE /api/v1/appointments/{id} existe y es DESTRUCTIVO
+  // (borra la fila, no la cancela). Por eso no hay boton de eliminar en la UI:
+  // la via correcta para anular una cita es el flujo de estados (/cancel), que
+  // deja rastro en el historial. Ver docs/SEGURIDAD.md.
 
   // Client-side search filtering on current page data
   const filteredAppointments = useMemo(() => {
