@@ -72,5 +72,11 @@ class Appointment(Base):
         _get_appointment_status, back_populates="appointments", foreign_keys=[status_id]
     )
     medical_note: Mapped["MedicalNote"] = relationship(
-        _get_medical_note, back_populates="appointment", uselist=False
+        _get_medical_note,
+        back_populates="appointment",
+        uselist=False,
+        # medical_notes.appointment_id es ON DELETE CASCADE en el esquema.
+        # Sin passive_deletes, SQLAlchemy intentaria ponerlo NULL al borrar la
+        # cita y el DELETE fallaria (la columna es NOT NULL).
+        passive_deletes=True,
     )

@@ -40,10 +40,14 @@ class Doctor(Base):
         Specialty, foreign_keys=[specialty_id]
     )
     branch: Mapped["Branch | None"] = relationship(Branch, foreign_keys=[branch_id])
+    # `passive_deletes=True` delega en la BD. Sin esto, SQLAlchemy emitia un
+    # UPDATE poniendole NULL a la FK hija, que en columnas NOT NULL hacia
+    # fallar el DELETE. El esquema define ON DELETE CASCADE para doctor_schedules
+    # y ON DELETE RESTRICT para medical_histories. Ver app/models/patient.py.
     schedules: Mapped[list["DoctorSchedule"]] = relationship(
-        "DoctorSchedule", back_populates="doctor"
+        "DoctorSchedule", back_populates="doctor", passive_deletes=True
     )
     medical_histories: Mapped[list["MedicalHistory"]] = relationship(
-        "MedicalHistory", back_populates="doctor"
+        "MedicalHistory", back_populates="doctor", passive_deletes=True
     )
     

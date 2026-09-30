@@ -17,23 +17,30 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    estados = sa.table(
-        "appointment_statuses",
-        sa.column("code", sa.String),
-        sa.column("description", sa.String),
-    )
-    op.bulk_insert(
-        estados,
-        [
-            {"code": "PENDIENTE", "description": "Cita pendiente de confirmación"},
-            {"code": "CONFIRMADA", "description": "Cita confirmada"},
-            {"code": "COMPLETADA", "description": "Cita completada"},
-            {"code": "CANCELADA", "description": "Cita cancelada"},
-            {"code": "SUSPENDIDA", "description": "Cita suspendida"},
-            {"code": "REAGENDADA", "description": "Cita reagendada a nueva fecha"},
-        ],
-    )
+    # NOTA: esta migracion crea `COMPLETADA` en lugar de `ATENDIDA`. No se
+    # corrige aqui a proposito: las migraciones ya aplicadas no se reescriben.
+    # La correccion vive en c9d2a1e6f304_normaliza_estados_cita, que remapea
+    # COMPLETADA -> ATENDIDA e inserta los 8 estados canonicos.
+    bind = op.get_bind()
+    for estado in [
+        {"code": "PENDIENTE", "description": "Cita pendiente de confirmación"},
+        {"code": "CONFIRMADA", "description": "Cita confirmada"},
+        {"code": "COMPLETADA", "description": "Cita completada"},
+        {"code": "CANCELADA", "description": "Cita cancelada"},
+        {"code": "SUSPENDIDA", "description": "Cita suspendida"},
+        {"code": "REAGENDADA", "description": "Cita reagendada a nueva fecha"},
+    ]:
+        # Idempotente: script_BD/seeds/seed_catalogs.sql puede haber corrido antes.
+        bind.execute(
+            sa.text(
+                "INSERT INTO appointment_statuses (code, description) "
+                "VALUES (:code, :description) ON CONFLICT (code) DO NOTHING"
+            ).bindparams(**estado)
+        )
 
 
 def downgrade() -> None:
-    op.execute("DELETE FROM appointment_statuses WHERE code IN ('PENDIENTE','CONFIRMADA','COMPLETADA','CANCELADA','SUSPENDIDA','REAGENDADA')")
+    op.execute(
+        "DELETE FROM appointment_statuses WHERE code IN "
+        "('PENDIENTE','CONFIRMADA','COMPLETADA','CANCELADA','SUSPENDIDA','REAGENDADA')"
+    )

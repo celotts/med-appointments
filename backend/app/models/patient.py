@@ -47,15 +47,27 @@ class Patient(Base):
         DateTime(timezone=True), server_default=func.current_timestamp(), nullable=True
     )
 
+    # `passive_deletes=True` delega la cascada en la base de datos.
+    #
+    # Sin esto, al borrar un paciente SQLAlchemy emitia
+    #   UPDATE notifications SET patient_id = NULL
+    # y `notifications.patient_id` es NOT NULL, asi que el DELETE fallaba con
+    # NotNullViolationError en cuanto el paciente tenia notificaciones
+    # (es decir, casi siempre: agendar una cita ya genera una).
+    #
+    # El esquema define ON DELETE CASCADE para waitlist y notifications, y
+    # ON DELETE RESTRICT para appointments y medical_histories. Delegando en la
+    # BD, cada relacion se comporta segun su FK real en lugar de recibir un
+    # UPDATE que ni el esquema contempla.
     appointments: Mapped[list["Appointment"]] = relationship(
-        _get_appointment, back_populates="patient"
+        _get_appointment, back_populates="patient", passive_deletes=True
     )
     waitlist_entries: Mapped[list["Waitlist"]] = relationship(
-        _get_waitlist, back_populates="patient"
+        _get_waitlist, back_populates="patient", passive_deletes=True
     )
     medical_histories: Mapped[list["MedicalHistory"]] = relationship(
-        MedicalHistory, back_populates="patient"
+        MedicalHistory, back_populates="patient", passive_deletes=True
     )
     notifications: Mapped[list["Notification"]] = relationship(
-        _get_notification, back_populates="patient"
+        _get_notification, back_populates="patient", passive_deletes=True
     )

@@ -8,11 +8,14 @@ from core import (
     crud_medical_note,
     crud_patient,
     crud_visual_indicator,
+    rbac,
 )
 from core.crud_notification import create_notification
 from dependencies import get_current_user, get_db
 from dependencies_i18n import I18nResponse, get_language
 from fastapi import APIRouter, Depends, HTTPException, Query
+from models.appointment import Appointment as AppointmentModel
+from models.medical_note import MedicalNote as MedicalNoteModel
 from models.user import User as UserModel
 from pydantic import BaseModel
 from schemas.appointment import (
@@ -25,6 +28,7 @@ from schemas.appointment import (
     MedicalNoteUpdate,
     PaginatedResponse,
 )
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -173,7 +177,7 @@ async def update_appointment(
         raise i18n.error("appointment_not_found", status_code=404)
     try:
         appt = await crud_appointment.update_appointment(
-            db, db_appointment, appointment_in
+            db, db_appointment, appointment_in, actor=current_user
         )
         return appt
     except ValueError as exc:
@@ -205,7 +209,9 @@ async def change_appointment_status(
     if not db_appointment:
         raise i18n.error("appointment_not_found", status_code=404)
     try:
-        return await crud_appointment.change_status(db, db_appointment, cambio)
+        return await crud_appointment.change_status(
+            db, db_appointment, cambio, actor=current_user
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -463,11 +469,41 @@ async def delete_appointment(
     )
     if not db_appointment:
         raise i18n.error("appointment_not_found", status_code=404)
-    await crud_appointment.delete_appointment(db, db_appointment)
+    await crud_appointment.delete_appointment(db, db_appointment, actor=current_user)
     return {"detail": i18n.get("appointment_deleted")}
 
 
 # ---------- Medical notes ----------
+#
+# Las notas se acceden a traves de la cita a la que pertenecen. Antes los
+# cuatro endpoints siguientes llamaban a `crud_medical_note` sin ningun
+# filtro por usuario: cualquier token valido podia leer, modificar y borrar
+# las notas medicas de CUALQUIER paciente (IDOR sobre datos clinicos).
+# `_assert_note_accessible` cierra ese hueco aplicando el mismo criterio de
+# propiedad que el resto de las citas (`user_id` de la cita).
+
+
+async def _assert_note_accessible(
+    db: AsyncSession,
+    appointment_id: int,
+    current_user: UserModel,
+    i18n: I18nResponse,
+) -> None:
+    """Verifica que el usuario pueda operar sobre esa cita.
+
+    Administradores y personal clinico pasan siempre. El resto solo puede
+    operar sobre las citas que le pertenecen.
+    """
+    if rbac.has_role(current_user, rbac.CLINICAL_ROLES):
+        return
+    owned = await crud_appointment.get_appointment(
+        db, appointment_id, user_id=current_user.id
+    )
+    if not owned:
+        # 404 y no 403: no revelamos que la cita existe pero es de otro.
+        raise i18n.error("appointment_not_found", status_code=404)
+
+
 @router.get(
     "/notes/",
     response_model=list[MedicalNoteOut],
@@ -479,11 +515,22 @@ async def list_notes(
     limit: int = 100,
     appointment_id: int | None = None,
     current_user: UserModel = Depends(get_current_user),
+    language: str = Depends(get_language),
 ) -> list[MedicalNoteOut]:
     """List of medical notes, optionally filtered by appointment."""
-    return await crud_medical_note.get_notes(
+    notes = await crud_medical_note.get_notes(
         db, skip=skip, limit=limit, appointment_id=appointment_id
     )
+    # Un paciente nunca ve la lista completa: solo las notas de sus citas.
+    if rbac.has_role(current_user, rbac.CLINICAL_ROLES):
+        return notes
+    propias = await db.execute(
+        select(MedicalNoteModel.id)
+        .join(AppointmentModel, AppointmentModel.id == MedicalNoteModel.appointment_id)
+        .where(AppointmentModel.user_id == current_user.id)
+    )
+    permitidos = set(propias.scalars().all())
+    return [n for n in notes if n.id in permitidos]
 
 
 @router.post(
@@ -505,13 +552,14 @@ async def create_note(
 ) -> MedicalNoteOut:
     """Creates a medical note for an appointment (one per appointment)."""
     i18n = I18nResponse(language)
+    await _assert_note_accessible(db, note_in.appointment_id, current_user, i18n)
     appointment = await crud_appointment.get_appointment(db, note_in.appointment_id)
     if not appointment:
         raise i18n.error("appointment_not_found", status_code=404)
     if await crud_medical_note.get_note_by_appointment(db, note_in.appointment_id):
         raise i18n.error("note_already_exists", status_code=400)
     try:
-        note = await crud_medical_note.create_note(db, note=note_in)
+        note = await crud_medical_note.create_note(db, note=note_in, actor=current_user)
     except IntegrityError:
         raise i18n.error("note_already_exists", status_code=400) from None
 
@@ -554,6 +602,7 @@ async def get_note(
     note = await crud_medical_note.get_note(db, note_id)
     if not note:
         raise i18n.error("note_not_found", status_code=404)
+    await _assert_note_accessible(db, note.appointment_id, current_user, i18n)
     return note
 
 
@@ -576,7 +625,8 @@ async def update_note(
     db_note = await crud_medical_note.get_note(db, note_id)
     if not db_note:
         raise i18n.error("note_not_found", status_code=404)
-    return await crud_medical_note.update_note(db, db_note, note_in)
+    await _assert_note_accessible(db, db_note.appointment_id, current_user, i18n)
+    return await crud_medical_note.update_note(db, db_note, note_in, actor=current_user)
 
 
 @router.delete(
@@ -594,7 +644,8 @@ async def delete_note(
 ) -> MedicalNoteOut:
     """Deletes a medical note."""
     i18n = I18nResponse(language)
-    note = await crud_medical_note.delete_note(db, note_id)
-    if not note:
+    db_note = await crud_medical_note.get_note(db, note_id)
+    if not db_note:
         raise i18n.error("note_not_found", status_code=404)
-    return note
+    await _assert_note_accessible(db, db_note.appointment_id, current_user, i18n)
+    return await crud_medical_note.delete_note(db, note_id, actor=current_user)
