@@ -1,202 +1,212 @@
-# Medical Appointments RAG API
+# Agenda Sana
 
-API contenerizada para la **gestión de citas médicas** (agendar, reagendar, transición de estados, notas clínicas), potenciada con un **agente conversacional RAG** (recuperación aumentada) que consulta la base de datos y documentos vectoriales en lenguaje natural.
+Gestión de citas médicas con asistente de IA **local**. FastAPI + PostgreSQL/pgvector
+en el backend, React + Vite en el frontend, Ollama para el LLM y los embeddings.
 
-- **Backend**: Python 3.14, FastAPI (asíncrono: asyncpg + SQLAlchemy AsyncSession)
-- **Base de datos**: PostgreSQL 16 + `pgvector` (contenedor `medical_pgvector`)
-- **IA local**: Ollama (`nomic-embed-text` para embeddings, `llama3.2` como LLM) + LangChain
-- **Migraciones**: Alembic (schema + seeds versionados)
-- **Autenticación**: JWT (OAuth2)
+Ningún dato clínico sale de la máquina.
 
 ---
 
-## Arquitectura
+## Empezar
 
-```text
-medical_appointments/
-│
+### Con Docker
+
+```bash
+cp .env.develop .env          # ajusta SECRET_KEY y la contraseña
+make up                       # postgres + api + frontend
+make seed                     # catálogos + datos de ejemplo
+```
+
+| Servicio | URL |
+|---|---|
+| Frontend | http://localhost:3000 |
+| API | http://localhost:5435 |
+| Swagger | http://localhost:5435/docs |
+| BD | `localhost:5433` |
+
+Alternativa con Podman: `make up-podman`. Ayuda: `make help`.
+
+### Sin Docker
+
+```bash
+docker compose up -d postgres-vector      # solo la BD
+cd backend && ./run.sh migrate && ./run.sh serve
+cd front && npm install && npm run dev
+```
+
+Requiere Ollama con los modelos:
+
+```bash
+ollama pull nomic-embed-text
+ollama pull llama3.2
+```
+
+---
+
+## Stack
+
+| Capa | Tecnología |
+|---|---|
+| Backend | Python 3.12 · FastAPI · SQLAlchemy 2 async · asyncpg · Alembic |
+| Base de datos | PostgreSQL 16 + pgvector |
+| Frontend | React 18 · TypeScript · Vite · Tailwind · react-router |
+| IA | Ollama local · `llama3.2` + `nomic-embed-text` · LangChain |
+| Auth | JWT (OAuth2 password flow) |
+
+**107 endpoints** en 74 rutas · **40 herramientas** de IA · **8 estados** de cita ·
+**6 roles**.
+
+---
+
+## Documentación
+
+**Si vienes a trabajar aquí, empieza por [`AGENTS.md`](AGENTS.md).**
+
+| Documento | Contenido |
+|---|---|
+| [`AGENTS.md`](AGENTS.md) | **Punto de entrada.** Reglas obligatorias y vocabulario |
+| [`TRABAJO_ACUERDO.md`](TRABAJO_ACUERDO.md) | Plan de trabajo y reglas del proyecto |
+| [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md) | Cómo está organizado el sistema |
+| [`docs/API.md`](docs/API.md) | Los 107 endpoints (generado) |
+| [`docs/AUDITORIA.md`](docs/AUDITORIA.md) | Registro de quién hizo qué y cuándo |
+| [`docs/ESTADOS_CITA.md`](docs/ESTADOS_CITA.md) | Máquina de estados |
+| [`docs/IA_AGENTE.md`](docs/IA_AGENTE.md) | RAG y las 40 herramientas |
+| [`docs/FRONTEND.md`](docs/FRONTEND.md) | Convenciones del frontend |
+| [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md) | Auth, roles y riesgos abiertos |
+| [`docs/CONVENCIONES.md`](docs/CONVENCIONES.md) | Cómo se escribe código aquí |
+| [`docs/CHECKLIST_ENTREGA.md`](docs/CHECKLIST_ENTREGA.md) | Antes de decir "terminado" |
+| [`docs/PENDIENTES.md`](docs/PENDIENTES.md) | Deuda técnica priorizada |
+| [`docs/DECISIONES.md`](docs/DECISIONES.md) | ADRs: decisiones ya tomadas |
+
+---
+
+## Comandos
+
+```bash
+# Calidad (no necesita Docker)
+make verify-docs           # docs vs código: 9 grupos de chequeos
+make gen-api-docs          # regenera docs/API.md desde OpenAPI
+
+# Pruebas
+make test                  # pytest (API) + typecheck (front)
+
+# Infraestructura
+make up / down / logs / ps / shell
+make seed                  # datos de prueba
+```
+
+---
+
+## Cómo funciona
+
+### Agendar
+
+1. `POST /api/v1/appointments/` crea la cita en `PENDIENTE`.
+2. El sistema detecta conflictos de horario y devuelve `409` si el slot está ocupado.
+3. Se notifica al paciente.
+
+### Estados
+
+El ciclo de vida es una máquina de estados explícita de 8 estados:
+
+```
+PENDIENTE → CONFIRMADA → EN ESPERA → EN PROCESO → ATENDIDA
+    ↓           ↓           ↓            ↓
+CANCELADA  REAGENDADA  SUSPENDIDA   CANCELADA
+```
+
+`ATENDIDA` y `CANCELADA` son terminales. Toda transición pasa por
+`VALID_TRANSITIONS` (`backend/app/schemas/appointment.py`).
+Detalle en [`docs/ESTADOS_CITA.md`](docs/ESTADOS_CITA.md).
+
+### IA
+
+Dos sistemas distintos:
+
+| Sistema | Ruta | Qué es |
+|---|---|---|
+| **RAG** | `/api/v1/rag/*` | Búsqueda semántica + agente conversacional con 40 herramientas |
+| **Medasist** | `/api/v1/medasist/*` | Lógica de agenda determinista, sin LLM |
+
+Las herramientas que modifican la base de datos exigen confirmación explícita y
+respetan la máquina de estados. Detalle en [`docs/IA_AGENTE.md`](docs/IA_AGENTE.md).
+
+---
+
+## Base de datos
+
+El esquema se crea con `script_BD/init.sql` (source of truth) y queda sellado
+con una migración baseline. Los cambios posteriores van en migraciones de
+Alembic versionadas.
+
+```bash
+cd backend
+./run.sh migrate                        # upgrade head
+venv/bin/python -m alembic heads        # debe haber UN solo head
+venv/bin/python -m alembic history
+```
+
+> No uses `alembic revision --autogenerate` sobre el baseline: detecta tablas
+> no modeladas (`audit_logs`, `waitlist`, `vector_documents`) como eliminadas y
+> las borra.
+
+Catálogos en `script_BD/seeds/`:
+
+| Archivo | Contenido |
+|---|---|
+| `seed_catalogs.sql` | Los 8 estados de cita + especialidades |
+| `seed_sample.sql` | Datos de ejemplo |
+
+---
+
+## Estructura
+
+```
+.
+├── AGENTS.md              # punto de entrada para la IA
+├── TRABAJO_ACUERDO.md     # reglas del proyecto
 ├── backend/
-│   ├── alembic/             # Migraciones de esquema y seeds
 │   ├── app/
-│   │   ├── api/endpoints/   # Routers (login, users, specialties, medicos,
-│   │   │                    #   pacientes, estados-cita, citas, notas, rag)
-│   │   ├── core/            # config, db, base, CRUDs, rag, agent
-│   │   ├── models/          # ORM (user, role, audit, specialty, medico,
-│   │   │                    #   paciente, estado_cita, cita, nota_medica)
-│   │   ├── schemas/         # Pydantic
-│   │   ├── dependencies.py  # get_db, get_current_user (JWT)
-│   │   └── main.py          # App FastAPI + registro de routers
-```
-
-│   ├── tests/               # Smoke tests integrales contra la BD real
-│   ├── run.sh               # Script de arranque/verificación
-│   └── requirements.txt
-│
-├── docker-compose.yml       # postgres(pgvector) + api
-├── script_BD/init.sql       # Esquema inicial (source-of-truth)
-└── .env                     # Variables de entorno (NO versionar)
-
----
-
-## Requisitos
-
-- Docker + Docker Compose (para la BD)
-- Ollama corriendo en `http://localhost:11434` con:
-  - `nomic-embed-text` (embeddings, 768 dims)
-  - `llama3.2` (LLM)
-
-  ```sh
-  ollama pull nomic-embed-text
-  ollama pull llama3.2
-  ```
-
-- Python 3.11+ (venv)
-
----
-
-## Configuración
-
-Crea un `.env` en la raíz del proyecto:
-
-```env
-DATABASE_URL=postgresql+asyncpg://root:fc100711@localhost:5432/appointment
-
-# Primer superusuario (se crea automáticamente al arrancar)
-FIRST_SUPERUSER_EMAIL=admin@medapi.com
-FIRST_SUPERUSER_PASSWORD=cambia_esta_password
-
-# Seguridad
-SECRET_KEY=genera_una_clave_secreta
-ACCESS_TOKEN_EXPIRE_SECONDS=90000
-
-# Ollama / RAG (opciones por defecto)
-# OLLAMA_BASE_URL=http://localhost:11434
-# OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-# OLLAMA_LLM_MODEL=llama3.2
-```sh
-# Ollama configuration example
-```
-
-### Levantar la base de datos
-
-```sh
-docker compose up -d db        # o el nombre del servicio del contenedor pgvector
+│   │   ├── main.py        # FastAPI, 18 routers
+│   │   ├── core/          # config, db, security, rbac, crud_*, rag, agent
+│   │   ├── api/endpoints/ # 18 routers
+│   │   ├── models/        # ORM
+│   │   ├── schemas/       # Pydantic
+│   │   └── services/      # notifications, prediction, scheduling
+│   ├── alembic/versions/  # 10 migraciones, 1 head
+│   ├── tests/             # pytest
+│   └── run.sh
+├── front/
+│   └── src/
+│       ├── pages/         # 15 páginas
+│       ├── components/    # common/ + layout/
+│       ├── api/           # 17 módulos + axiosInstance + tokenStorage
+│       ├── auth/roles.ts  # roles canónicos
+│       └── contexts/
+├── script_BD/             # init.sql + seeds
+├── scripts/               # verify_docs.py, gen_api_docs.py, seed.sh
+└── docs/                  # documentación verificada
 ```
 
 ---
 
-## Ejecución (backend/run.sh)
+## Seguridad
 
-```sh
-cd backend
-./run.sh serve       # API en http://127.0.0.1:8000 (Swagger en /docs)
-./run.sh test        # Ejecuta los 4 smoke tests integrales (python -m)
-./run.sh pytest      # Idem pero con pytest (pytest-asyncio)
-./run.sh migrate     # Aplica migraciones pendientes de Alembic
-./run.sh seeds       # Verifica la semilla de estados de cita (idempotente)
-./run.sh routes      # Lista todas las rutas de la API
-```
+Autenticación JWT + RBAC de 6 roles. Ver
+[`docs/SEGURIDAD.md`](docs/SEGURIDAD.md) para lo corregido y lo pendiente.
 
-> **Nota**: el script invoca módulos con `venv/bin/python -m` porque los shebangs de los binarios del venv están rotos. También carga el `.env` automáticamente.
+**Antes de producción, atender los P0 de
+[`docs/PENDIENTES.md`](docs/PENDIENTES.md)**: el endpoint de chat expone
+herramientas de escritura SQL a cualquier usuario autenticado, el bloque de
+facturación y recetas no filtra por rol, y no hay auditoría de cambios de
+estado.
 
 ---
 
-## Migraciones (Alembic)
+## Estado
 
-El esquema se crea inicialmente desde `script_BD/init.sql` y se "sella" con una baseline; los cambios posteriores (incluidos seeds de datos) se gestionan con versiones versionadas:
+Funcional: agendar, confirmar, máquina de estados completa, notas clínicas, RAG
+con agente de 40 herramientas, notificaciones, reportes, multi-sede, roles.
 
-```sh
-cd backend
-./run.sh migrate             # upgrade head
-venv/bin/python -m alembic revision -m "descripcion"   # nueva migración
-venv/bin/python -m alembic history                      # historial
-```
-
-> Advertencia: no usar `alembic revision --autogenerate` sobre la baseline, ya que detecta tablas no modeladas como "eliminadas" y las borraría.
-
----
-
-## Endpoints
-
-Autenticación (Bearer JWT):
-
-- `POST /api/v1/login/access-token`
-
-Catálogos:
-
-- `GET|POST /api/v1/specialties/` · `GET|PUT|DELETE /api/v1/specialties/{id}`
-- `GET|POST /api/v1/medicos/` · `GET|PUT|DELETE /api/v1/medicos/{id}`
-- `GET|POST /api/v1/pacientes/` · `GET|PUT|DELETE /api/v1/pacientes/{id}`
-- `GET /api/v1/estados-cita/`
-
-Núcleo de negocio (citas y notas):
-
-- `GET|POST /api/v1/citas/` — listar/filtrar y **agendar** (detección de conflictos de horario → 409)
-- `GET|PUT|DELETE /api/v1/citas/{id}` — **reagendar** (transiciona a `REAGENDADA`)
-- `PATCH /api/v1/citas/{id}/estado` — **cambiar estado** (máquina de transiciones válidas)
-- `GET|POST /api/v1/notas/` · `GET|PUT|DELETE /api/v1/notas/{id}` — notas médicas (1 por cita)
-
-RAG / AI Agent:
-
-- `GET /api/v1/rag/health` — estado de Ollama + nº de vectores
-- `POST /api/v1/rag/ingest` — ingesta de un documento vectorial
-- `POST /api/v1/rag/ingest-nota/{cita_id}` — indexa una nota médica existente
-- `POST /api/v1/rag/search` — búsqueda semántica por embedding
-- `POST /api/v1/rag/chat` — conversación con el agente MedAssist
-
----
-
-## Agente MedAssist (RAG + Tool Calling)
-
-El endpoint `POST /api/v1/rag/chat` recibe:
-
-```json
-{
-  "message": "¿Qué citas tiene el médico Rosa Vega?",
-  "historial": [{"role": "user", "content": "..."}]
-}
-```
-
-El agente usa **tool calling** con las herramientas:
-
-| Herramienta | Acción |
-| --- | --- |
-| `buscar_en_documentos` | Búsqueda semántica sobre `documentos_vectoriales` |
-| `consultar_citas_paciente` / `consultar_citas_medico` | Citas por nombre completo |
-| `buscar_pacientes` / `buscar_medicos` | Alta de catálogos por nombre |
-| `contar_registros` | Totales de pacientes, médicos, citas, etc. |
-| `sugerir_reagendamiento` | Propone reagendar (pide confirmación, no ejecuta) |
-| `ejecutar_reagendamiento` | **Ejecuta** el reagendamiento (requiere `confirmado=true`) |
-| `cancelar_cita` | **Cancela** la cita (requiere `confirmado=true`) |
-
-Las herramientas de ejecución exigen confirmación explícita del usuario y respetan la máquina de estados (no se puede cancelar/reagendar una cita ya `CANCELADA`/`COMPLETADA`).
-
----
-
-## Tests
-
-Smoke tests integrales ejecutados contra la BD **real** (no requieren mocks), crean y limpian sus propios datos con sufijos únicos por corrida.
-
-```sh
-cd backend
-./run.sh test
-# o individualmente:
-./run.sh test test_citas
-# o con pytest (pytest-asyncio, loop de sesión compartido):
-./run.sh pytest
-```
-
-- `test_specialties.py` — CRUD + auth (401 sin token)
-- `test_medicos_pacientes.py` — CRUD + validación FK y unicidad
-- `test_citas.py` — agendar/conflicto/reagendar/estados/notas
-- `test_rag.py` — RAG, embeddings, búsqueda semántica, chat y herramientas de ejecución
-
-Requisitos de test: BD levantada + Ollama con los modelos descargados.
-
----
-
-## Estado de las tablas de negocio
-
-Se crean desde `script_BD/init.sql` y quedan selladas en migración. La semilla de `estados_cita` (PENDIENTE, CONFIRMADA, COMPLETADA, CANCELADA, SUSPENDIDA, REAGENDADA) se inserta vía migración.
-
-*Proyecto desarrollado en `develop/python/med-appointments`; hay una rama git `conf/init_backend_appointment`.*
+En desarrollo: auditoría de cambios, rate limiting, tests de frontend, y
+limpieza de código muerto. Detalle en [`docs/PENDIENTES.md`](docs/PENDIENTES.md).

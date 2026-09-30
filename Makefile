@@ -214,6 +214,23 @@ podman-help:
 	@echo "  make format-podman   - Formateo con Podman"
 	@echo "  make seed-podman     - Datos de prueba"
 
+# ============================================================================
+# CALIDAD
+# ============================================================================
+
+# Verifica que la documentación no se haya desincronizado del código.
+# No necesita Docker ni base de datos. Debe salir "TODO CORRECTO".
+verify-docs:
+	@echo "==> Verificando documentación vs código..."
+	@backend/venv/bin/python scripts/verify_docs.py
+
+# Regenera docs/API.md desde el esquema OpenAPI.
+gen-api-docs:
+	@backend/venv/bin/python scripts/gen_api_docs.py
+
+# Puerta de calidad completa, sin Docker.
+check: verify-docs
+
 # Ayuda general
 help:
 	@echo "=== Makefile: Gestión de Contenedores ==="
@@ -233,6 +250,11 @@ help:
 	@echo "  make format          - Formatear código (black + isort)"
 	@echo "  make seed            - Cargar datos de prueba"
 	@echo "  make test            - Pruebas: pytest (API) + typecheck (front)"
+	@echo ""
+	@echo "--- Calidad ---"
+	@echo "  make verify-docs     - Verifica docs vs código (sin Docker)"
+	@echo "  make gen-api-docs    - Regenera docs/API.md desde OpenAPI"
+	@echo "  make check           - Atajo: verify-docs"
 	@echo ""
 	@echo "--- Podman (explicito) ---"
 	@echo "  make up-podman       - Levantar con Podman"
