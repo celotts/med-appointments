@@ -36,6 +36,17 @@ ADMIN_ROLES: frozenset[str] = frozenset({SUPER_ADMIN, ADMIN})
 # Roles que gestionan la agenda clinica (operan sobre citas de otros).
 CLINICAL_ROLES: frozenset[str] = frozenset({SUPER_ADMIN, ADMIN, DOCTOR, SPECIALIST, ASSISTANT})
 
+# Roles que llevan la agenda SIN ser administradores: el especialista y el
+# asistente. Son los unicos que consumen el dashboard operativo.
+#
+# Se separan de CLINICAL_ROLES a proposito: un asistente puede ver la agenda
+# de los especialistas que tiene asignados, pero no la de toda la clinica.
+AGENDA_ROLES: frozenset[str] = frozenset({DOCTOR, SPECIALIST, ASSISTANT})
+
+# Union de los anteriores: quien puede abrir el dashboard. Los administradores
+# lo ven con alcance de clinica completa.
+DASHBOARD_ROLES: frozenset[str] = CLINICAL_ROLES
+
 # Alias historicos que se aceptan al comparar, por compatibilidad con
 # datos ya sembrados y con codigo existente que aun no migra.
 _ALIASES: dict[str, str] = {

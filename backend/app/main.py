@@ -14,6 +14,7 @@ from api.endpoints import (  # noqa: E402
     assistants,
     audit,
     consulting_rooms,
+    dashboard,
     doctor_schedules,
     doctors,
     integrations,
@@ -125,6 +126,9 @@ app.include_router(medasist.router)
 
 # Auditoría (solo admin; ver api/endpoints/audit.py)
 app.include_router(audit.router)
+
+# Dashboard operativo (DOCTOR/SPECIALIST/ASSISTANT/ADMIN; ver endpoints/dashboard.py)
+app.include_router(dashboard.router)
 
 # Other endpoints
 app.include_router(notifications.router)
