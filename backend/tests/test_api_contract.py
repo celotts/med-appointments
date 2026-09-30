@@ -87,7 +87,21 @@ async def test_catalogo_estados_de_cita(client, auth_headers):
     response = await client.get("/api/v1/appointment-statuses/", headers=auth_headers)
     assert response.status_code == 200, response.text
     codes = {item["code"] for item in response.json()}
-    assert {"PENDIENTE", "CONFIRMADA", "COMPLETADA", "CANCELADA"} <= codes
+    # Los 8 estados canonicos deben existir en la BD. Si falta alguno,
+    # las transiciones que lo usan (/wait, /start, /attend) fallan.
+    canonicos = {
+        "PENDIENTE",
+        "CONFIRMADA",
+        "EN ESPERA",
+        "EN PROCESO",
+        "ATENDIDA",
+        "CANCELADA",
+        "SUSPENDIDA",
+        "REAGENDADA",
+    }
+    assert canonicos <= codes, f"Faltan estados canonicos: {canonicos - codes}"
+    # COMPLETADA fue el nombre historico; ya no debe existir (causan ambiguedad).
+    assert "COMPLETADA" not in codes
 
 
 # --------------------------------------------------------------------------

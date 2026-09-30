@@ -12,7 +12,12 @@ from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 APP_DIR = BACKEND_DIR / "app"
-for _p in (str(APP_DIR), str(BACKEND_DIR)):
+# `BACKEND_DIR` entra primero: los tests deben importar siempre `app.*`
+# (ej. `app.models.audit`). Anadir tambien `APP_DIR` hace que `models` y
+# `app.models` se puedan cargar como modulos distintos, y SQLAlchemy registra
+# las tablas dos veces sobre el mismo MetaData:
+#   InvalidRequestError: Table 'assistant_specialists' is already defined
+for _p in (str(BACKEND_DIR),):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
@@ -26,10 +31,9 @@ os.environ.setdefault("SECRET_KEY", "dev-test-secret")
 
 import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
-from httpx import ASGITransport, AsyncClient  # noqa: E402
-
 from app.initial_data import main as bootstrap_initial_data  # noqa: E402
 from app.main import app  # noqa: E402
+from httpx import ASGITransport, AsyncClient  # noqa: E402
 
 
 @pytest.fixture(scope="session")
@@ -58,3 +62,19 @@ async def auth_headers(client):
     assert response.status_code == 200, f"login {response.status_code}: {response.text}"
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest_asyncio.fixture
+async def db_session():
+    """Sesion de BD propia para tests que necesitan consultar directamente.
+
+    `pytest-asyncio` corre en modo "auto" con un loop de sesion, asi que cada
+    test obtiene su propia sesion y la cierra al terminar.
+    """
+    from app.core.db import SessionLocal
+
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        await session.close()
