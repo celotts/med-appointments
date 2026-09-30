@@ -16,6 +16,18 @@ import AIAssistantPage from '../pages/AIAssistantPage';
 import ReportsPage from '../pages/ReportsPage';
 import SettingsPage from '../pages/SettingsPage';
 import MainLayout from '../components/layout/MainLayout';
+import {
+  SUPER_ADMIN,
+  ADMIN,
+  DOCTOR,
+  SPECIALIST,
+  ASSISTANT,
+} from '../auth/roles';
+
+/** Espejo de `rbac.DASHBOARD_ROLES`. */
+const DASHBOARD_ROLES = [SUPER_ADMIN, ADMIN, DOCTOR, SPECIALIST, ASSISTANT] as const;
+/** Espejo de `rbac.ADMIN_ROLES`. */
+const ADMIN_ROLES = [SUPER_ADMIN, ADMIN] as const;
 
 const AppRoutes: React.FC = () => {
   return (
@@ -24,17 +36,62 @@ const AppRoutes: React.FC = () => {
 
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
-          <Route path="/" element={<DashboardPage />} />
+          {/* El panel operativo exige un rol de agenda en el backend; el
+              `Navigate` de ProtectedRoute evita mostrarlo a un PATIENT. */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute roles={DASHBOARD_ROLES}>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/appointments" element={<AppointmentsPage />} />
           <Route path="/patients" element={<PatientsPage />} />
           <Route path="/doctors" element={<DoctorsPage />} />
           <Route path="/specialties" element={<SpecialtyPage />} />
-          <Route path="/branches" element={<BranchPage />} />
-          <Route path="/roles" element={<RolePage />} />
-          <Route path="/appointment-statuses" element={<AppointmentStatusPage />} />
+          {/* Rutas de administracion: el backend ya exige require_admin. */}
+          <Route
+            path="/branches"
+            element={
+              <ProtectedRoute roles={ADMIN_ROLES}>
+                <BranchPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/roles"
+            element={
+              <ProtectedRoute roles={ADMIN_ROLES}>
+                <RolePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/appointment-statuses"
+            element={
+              <ProtectedRoute roles={ADMIN_ROLES}>
+                <AppointmentStatusPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/consulting-rooms" element={<ConsultingRoomPage />} />
-          <Route path="/doctor-schedules" element={<DoctorSchedulePage />} />
-          <Route path="/ai-assistant" element={<AIAssistantPage />} />
+          <Route
+            path="/doctor-schedules"
+            element={
+              <ProtectedRoute roles={DASHBOARD_ROLES}>
+                <DoctorSchedulePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ai-assistant"
+            element={
+              <ProtectedRoute roles={DASHBOARD_ROLES}>
+                <AIAssistantPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>

@@ -1,243 +1,308 @@
-import React, { useState, useEffect } from 'react';
-import { Users, Calendar, CheckCircle, AlertCircle, TrendingUp, FileText, X } from 'lucide-react';
-import { reportsApi, DashboardSummary } from '../api/reportsApi';
-import { patientApi, Patient } from '../api/patientApi';
+import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
-import DataTable, { Column } from '../components/common/DataTable';
+import {
+  Activity,
+  CalendarCheck,
+  CalendarDays,
+  Loader2,
+  RefreshCw,
+  TrendingUp,
+  UserX,
+  Users,
+  ChevronDown,
+} from 'lucide-react';
 
-const StatCard = ({ title, value, icon: Icon, color, onClick, clickable = false }: any) => (
-  <div 
-    className={`bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 transition-all ${clickable ? 'cursor-pointer hover:shadow-lg hover:-translate-y-0.5' : 'hover:shadow-md'}`}
-    onClick={onClick}
-    role={clickable ? 'button' : undefined}
-    tabIndex={clickable ? 0 : undefined}
-    onKeyDown={clickable ? (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') onClick(); } : undefined}
-  >
-    <div className={`p-3 rounded-xl ${color} text-white`}>
-      <Icon size={24} />
-    </div>
-    <div>
-      <p className="text-sm text-medical-textMuted font-medium">{title}</p>
-      <h3 className="text-2xl font-bold text-medical-textMain">{value}</h3>
-    </div>
-  </div>
-);
+import {
+  dashboardApi,
+  type AgendaCita,
+  type CalendarioMes,
+  type DashboardKpis,
+  type DashboardSchedule,
+  type DashboardScope,
+  type DashboardSerie,
+  type DashboardToday,
+  type DashboardWorkload,
+} from '../api/dashboardApi';
+import StatCard from '../components/dashboard/StatCard';
+import SerieDiaria from '../components/dashboard/SerieDiaria';
+import CargaPorMedico from '../components/dashboard/CargaPorMedico';
+import DistribucionEstados from '../components/dashboard/DistribucionEstados';
+import AgendaDelDia from '../components/dashboard/AgendaDelDia';
+import CalendarioMensual from '../components/dashboard/CalendarioMensual';
+import DetalleCitaModal from '../components/dashboard/DetalleCitaModal';
+import { useAuth } from '../contexts/AuthContext';
+import { hasRole, DOCTOR, SPECIALIST, ASSISTANT } from '../auth/roles';
 
-const pad = (n: number) => String(n).padStart(2, '0');
-const formatDate = (iso?: string) => {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
-};
-
+/**
+ * Dashboard operativo para quien lleva la agenda.
+ *
+ * ## Que se ve segun el rol
+ *
+ * El backend ya limita los datos (`crud_agenda_scope`), asi que esta pagina
+ * no filtra nada: solo cambia el titulo y el orden de las secciones para no
+ * mostrarle a un asistente una tabla que siempre saldra vacia.
+ *
+ * ## Nada de numeros inventados
+ *
+ * La version anterior de esta pagina mostraba "Tasa de No-Show 12%", "Carga de
+ * Trabajo: Alta" y un texto de insights de IA como texto literal. Todo eso era
+ * fiction: no venia de ninguna consulta. Aqui cada numero viene de
+ * `/api/v1/dashboard/*`.
+ */
 const DashboardPage: React.FC = () => {
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [showPatientsModal, setShowPatientsModal] = useState(false);
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [patientsLoading, setPatientsLoading] = useState(false);
+  const { user } = useAuth();
+  const esAsistente = hasRole(user?.role, [ASSISTANT]);
+  const esMedico = hasRole(user?.role, [DOCTOR, SPECIALIST]);
 
-  const loadDashboardData = async () => {
+  const [scope, setScope] = useState<DashboardScope | null>(null);
+  const [kpis, setKpis] = useState<DashboardKpis | null>(null);
+  const [hoy, setHoy] = useState<DashboardToday | null>(null);
+  const [serie, setSerie] = useState<DashboardSerie | null>(null);
+  const [workload, setWorkload] = useState<DashboardWorkload | null>(null);
+  const [agenda, setAgenda] = useState<DashboardSchedule | null>(null);
+  const [calendario, setCalendario] = useState<CalendarioMes | null>(null);
+  const [citaAbierta, setCitaAbierta] = useState<AgendaCita | null>(null);
+  const [diaSeleccionado, setDiaSeleccionado] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [diasSerie, setDiasSerie] = useState(14);
+  // `null` = el mes actual. Se guardan por separado para que "anterior" y
+  // "siguiente" funcionen desde cualquier mes, no solo desde el actual.
+  const [mesVista, setMesVista] = useState<{ anio: number; mes: number } | null>(null);
+
+  const cargar = useCallback(async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      const data = await reportsApi.getDashboardSummary();
-      setSummary(data);
+      // Todas las peticiones en paralelo: son 6 y ninguna depende de otra.
+      // En cascada el panel tardaria 6x lo que necesita.
+      const [s, k, t, se, w, a, c] = await Promise.all([
+        dashboardApi.getScope(),
+        dashboardApi.getKpis(),
+        dashboardApi.getToday(),
+        dashboardApi.getSerie(diasSerie),
+        dashboardApi.getWorkload(),
+        dashboardApi.getSchedule(),
+        dashboardApi.getCalendario(mesVista?.anio, mesVista?.mes),
+      ]);
+      setScope(s);
+      setKpis(k);
+      setHoy(t);
+      setSerie(se);
+      setWorkload(w);
+      setAgenda(a);
+      setCalendario(c);
     } catch (error: any) {
-      console.error('Dashboard fetch error:', error);
-      toast.error('Error al cargar las estadísticas del panel');
+      // 403 = el usuario no tiene rol de agenda. Es una situacion prevista, no
+      // un fallo: se dice que es y no se muestra un error rojo generico.
+      if (error?.response?.status === 403) {
+        toast.error('Su rol no tiene acceso al panel operativo.');
+      } else {
+        toast.error('No se pudieron cargar los datos del panel.');
+      }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [diasSerie, mesVista]);
 
-  const loadPatients = async () => {
-    try {
-      setPatientsLoading(true);
-      const data = await patientApi.getAll(0, 1000);
-      setPatients(data || []);
-    } catch (error: any) {
-      console.error('Patients fetch error:', error);
-      toast.error('Error al cargar la lista de pacientes');
-    } finally {
-      setPatientsLoading(false);
+  /** Cambia de mes y recarga solo el calendario, no todo el panel. */
+  const moverMes = useCallback((delta: number) => {
+    const hoy = new Date();
+    const base = mesVista ?? { anio: hoy.getFullYear(), mes: hoy.getMonth() + 1 };
+    let mes = base.mes + delta;
+    let anio = base.anio;
+    if (mes < 1) {
+      mes = 12;
+      anio -= 1;
+    } else if (mes > 12) {
+      mes = 1;
+      anio += 1;
     }
-  };
-
-  const openPatientsModal = () => {
-    setShowPatientsModal(true);
-    loadPatients();
-  };
-
-  const closePatientsModal = () => {
-    setShowPatientsModal(false);
-    setPatients([]);
-  };
+    setMesVista({ anio, mes });
+  }, [mesVista]);
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    cargar();
+  }, [cargar]);
 
   if (isLoading) {
     return (
-      <div className="h-full flex flex-col items-center justify-center py-20 text-slate-400">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-medical-primary mb-4"></div>
-        <p className="text-sm">Sincronizando panel de control...</p>
+      <div className="flex flex-col items-center justify-center py-24 text-slate-400">
+        <Loader2 className="animate-spin mb-3" size={32} />
+        <p className="text-sm">Cargando panel...</p>
       </div>
     );
   }
 
-  const patientColumns: Column<Patient>[] = [
-    {
-      header: 'Documento',
-      accessor: 'document_number',
-      type: 'string',
-      sortable: true,
-    },
-    {
-      header: 'Nombre',
-      accessor: (p: Patient) => (
-        <span className="font-medium text-medical-textMain">{p.first_name} {p.last_name}</span>
-      ),
-      sortable: true,
-    },
-    {
-      header: 'Email',
-      accessor: 'email',
-      type: 'string',
-      sortable: true,
-    },
-    {
-      header: 'Teléfono',
-      accessor: 'phone',
-      type: 'string',
-      sortable: true,
-    },
-    {
-      header: 'Fecha Nacimiento',
-      accessor: (p: Patient) => formatDate(p.birth_date),
-      type: 'date',
-      sortable: true,
-    },
-  ];
+  // El titulo dice que se esta viendo, porque el alcance cambia por rol y una
+  // pantalla sin etiqueta no deja claro si los numeros son propios o de la
+  // clinica entera.
+  const titulo = scope?.es_admin
+    ? 'Panel de la clinica'
+    : esMedico
+      ? 'Mi agenda'
+      : esAsistente
+        ? 'Agenda de mis especialistas'
+        : 'Panel';
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-medical-textMain">Panel de Control</h2>
-          <p className="text-medical-textMuted">Resumen general de la actividad clínica</p>
+          <h2 className="text-2xl font-bold text-medical-textMain">{titulo}</h2>
+          <p className="text-sm text-medical-textMuted">
+            {hoy
+              ? `${hoy.cerradas} de ${hoy.total} citas resueltas hoy`
+              : 'Resumen de la actividad clinica'}
+          </p>
         </div>
         <button
-          onClick={loadDashboardData}
-          className="p-2 text-slate-400 hover:text-medical-primary transition-colors"
-          title="Actualizar datos"
+          onClick={cargar}
+          disabled={isLoading}
+          className="p-2 text-slate-400 hover:text-medical-primary transition-colors disabled:opacity-50"
+          title="Actualizar"
+          aria-label="Actualizar datos"
         >
-          <TrendingUp size={20} />
+          <RefreshCw size={20} />
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Total Pacientes"
-          value={summary?.total_patients || 0}
-          icon={Users}
-          color="bg-blue-500"
-          onClick={openPatientsModal}
-          clickable={true}
-        />
-        <StatCard
-          title="Citas Hoy"
-          value={summary?.total_appointments_today || 0}
-          icon={Calendar}
-          color="bg-indigo-500"
-        />
-        <StatCard
-          title="Completadas"
-          value={summary?.appointments_completed_today || 0}
-          icon={CheckCircle}
-          color="bg-emerald-500"
-        />
-        <StatCard
-          title="Pendientes"
-          value={summary?.appointments_pending || 0}
-          icon={AlertCircle}
-          color="bg-amber-500"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-medical-textMain">Actividad Reciente</h3>
-            <button className="text-sm text-medical-secondary hover:underline font-medium">Ver todas</button>
-          </div>
-          <div className="space-y-4">
-            {summary ? (
-              <div className="text-center py-10 text-slate-400 italic">
-                No hay actividad reciente para mostrar en este momento.
-              </div>
-            ) : (
-              <div className="text-center py-10 text-slate-400 italic">Cargando...</div>
-            )}
-          </div>
+      {kpis && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard
+            titulo="Citas hoy"
+            valor={kpis.citas_hoy}
+            icono={CalendarDays}
+            colorIcono="bg-medical-primary"
+            detalle={`${kpis.citas_hoy_confirmadas} confirmadas, ${kpis.citas_hoy_pendientes} por confirmar`}
+          />
+          <StatCard
+            titulo="Atendidas este mes"
+            valor={kpis.atendidas_mes}
+            icono={CalendarCheck}
+            colorIcono="bg-medical-personal"
+            detalle={`${kpis.tasa_asistencia_pct}% de las citas resueltas`}
+          />
+          <StatCard
+            titulo="Inasistencias"
+            valor={kpis.inasistencias_mes}
+            icono={UserX}
+            colorIcono="bg-medical-danger"
+            detalle={`${kpis.tasa_inasistencia_pct}% de las citas ya vencidas`}
+          />
+          <StatCard
+            titulo="Esta semana"
+            valor={kpis.citas_semana}
+            icono={TrendingUp}
+            colorIcono="bg-medical-visit"
+            detalle={`${kpis.citas_mes} en lo que va de mes`}
+          />
         </div>
+      )}
+
+      {/*
+        Sin `items-stretch` ni alturas forzadas: cada card mide lo que necesita
+        su contenido. Intentar igualarlos genera huecos en los dos sentidos: con
+        18 citas la agenda crecia a 792px y dejaba 490px de blanco bajo "Estado
+        del dia".
+
+        Ahora las dos columnas terminan a alturas parecidas porque su contenido
+        es parecido, no porque se fuerce nada. La agenda lleva `max-h` con
+        scroll propio para que 40 citas no alarguen la pagina entera.
+      */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
+        {hoy && (
+          <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h3 className="text-lg font-semibold text-medical-textMain mb-5">
+              Estado del dia
+            </h3>
+            <DistribucionEstados resumen={hoy} />
+          </div>
+        )}
 
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center gap-2 mb-6">
-            <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-              <FileText size={20} />
-            </div>
-            <h3 className="text-lg font-semibold text-medical-textMain">Insights de IA</h3>
+          <div className="flex items-baseline justify-between mb-4">
+            <h3 className="text-lg font-semibold text-medical-textMain">
+              Agenda de hoy
+            </h3>
+            {agenda && agenda.total > 0 && (
+              <span className="text-xs text-medical-textMuted">
+                {agenda.total} {agenda.total === 1 ? 'cita' : 'citas'}
+              </span>
+            )}
           </div>
-          <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
-            <p className="text-sm text-blue-800 leading-relaxed italic">
-              "Basado en los datos actuales, la tasa de inasistencia ha disminuido un 5% esta semana. Se recomienda mantener el sistema de recordatorios activos."
+          {/* `overscroll-contain` evita que al llegar al final siga
+              desplazando la pagina de detras. */}
+          <div className="-mx-2 px-2 max-h-[26rem] overflow-y-auto overscroll-contain">
+            {agenda && (
+              <AgendaDelDia citas={agenda.citas} onSelectCita={setCitaAbierta} />
+            )}
+          </div>
+          {agenda && agenda.total > 5 && (
+            <p className="mt-3 pt-3 border-t border-slate-100 text-[11px] text-medical-textMuted flex items-center gap-1">
+              <ChevronDown size={12} />
+              Desplace para ver las {agenda.total} citas
             </p>
-          </div>
-          <div className="mt-6 space-y-3">
-            <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-              <span className="text-xs text-slate-500">Tasa de No-Show</span>
-              <span className="text-xs font-bold text-emerald-600">12% ↓</span>
-            </div>
-            <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-              <span className="text-xs text-slate-500">Carga de Trabajo</span>
-              <span className="text-xs font-bold text-amber-600">Alta</span>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
-      {showPatientsModal && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-5xl w-full max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-slate-200 sticky top-0 bg-white rounded-t-2xl">
-              <h3 className="text-lg font-semibold text-medical-textMain">Total Pacientes ({patients.length})</h3>
-              <button
-                onClick={closePatientsModal}
-                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                aria-label="Cerrar"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-hidden p-4">
-              {patientsLoading ? (
-                <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-medical-primary mb-4"></div>
-                  <p className="text-sm">Cargando pacientes...</p>
-                </div>
-              ) : (
-                <DataTable
-                  data={patients}
-                  columns={patientColumns}
-                  defaultSortKey="first_name"
-                  defaultSortDirection="asc"
-                />
-              )}
+      {calendario && (
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <CalendarioMensual
+            calendario={calendario}
+            seleccionado={diaSeleccionado}
+            onSeleccionar={setDiaSeleccionado}
+            onMesAnterior={() => moverMes(-1)}
+            onMesSiguiente={() => moverMes(1)}
+          />
+        </div>
+      )}
+
+      <DetalleCitaModal cita={citaAbierta} onClose={() => setCitaAbierta(null)} />
+
+      {serie && (
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-lg font-semibold text-medical-textMain">
+              Actividad por dia
+            </h3>
+            <div className="flex gap-1">
+              {[7, 14, 30].map((opcion) => (
+                <button
+                  key={opcion}
+                  onClick={() => setDiasSerie(opcion)}
+                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    diasSerie === opcion
+                      ? 'bg-medical-primary text-white'
+                      : 'bg-slate-100 text-medical-textMuted hover:bg-slate-200'
+                  }`}
+                >
+                  {opcion} dias
+                </button>
+              ))}
             </div>
           </div>
+          <SerieDiaria datos={serie.data} />
         </div>
+      )}
+
+      {workload && (
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div className="flex items-center gap-2 mb-5">
+            <Users size={20} className="text-medical-primary" />
+            <h3 className="text-lg font-semibold text-medical-textMain">
+              Carga por medico
+            </h3>
+          </div>
+          <CargaPorMedico datos={workload.data} />
+        </div>
+      )}
+
+      {scope?.es_admin && (
+        <p className="flex items-center gap-2 text-xs text-medical-textMuted">
+          <Activity size={14} />
+          Estas viendo toda la clinica. Los Especialistas y Asistentes ven
+          unicamente las citas de su alcance.
+        </p>
       )}
     </div>
   );

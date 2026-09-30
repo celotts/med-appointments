@@ -21,6 +21,14 @@ export const PATIENT = 'PATIENT';
 /** Roles con permisos de administracion de la clinica. */
 export const ADMIN_ROLES = [SUPER_ADMIN, ADMIN] as const;
 
+/**
+ * Roles que llevan la agenda sin ser administradores: el especialista y el
+ * asistente. Es el conjunto que consume el dashboard operativo.
+ *
+ * Espejo de `AGENDA_ROLES` en backend/app/core/rbac.py.
+ */
+export const AGENDA_ROLES = [DOCTOR, SPECIALIST, ASSISTANT] as const;
+
 /** Alias historicos que se normalizan al rol canonico. */
 const ALIASES: Record<string, string> = {
   SUPERADMIN: SUPER_ADMIN,
